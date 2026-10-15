@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181a1f"/>
+      <stop offset="100%" stop-color="#0e0f12"/>
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#f97316" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  <rect width="508" height="508" x="2" y="2" rx="126" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+
+  <!-- Subtle inner radial glow behind D -->
+  <circle cx="256" cy="256" r="160" fill="url(#glowGrad)"/>
+
+  <!-- Stylized Geometric "D" Monogram -->
+  <path d="M 168 128 L 260 128 C 340 128 392 180 392 256 C 392 332 340 384 260 384 L 168 384 Z" fill="none" stroke="url(#orangeGrad)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Flow lines inside D -->
+  <line x1="168" y1="210" x2="270" y2="210" stroke="#f3f4f6" stroke-width="24" stroke-linecap="round"/>
+  <line x1="168" y1="270" x2="295" y2="270" stroke="#f3f4f6" stroke-width="24" stroke-linecap="round"/>
+  <line x1="168" y1="330" x2="245" y2="330" stroke="#f3f4f6" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Dynamic Orange Activity Dot -->
+  <circle cx="340" cy="180" r="18" fill="#fb923c"/>
+</svg>

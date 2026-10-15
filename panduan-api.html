@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Panduan & Tata Cara Gemini API Key — DayFlow</title>
+  
+  <meta name="theme-color" content="#0e0f12">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/style.css?v=2.9">
+
+  <style>
+    .doc-page-container {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: var(--space-6) var(--space-5) 120px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+    .doc-header-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: var(--space-4);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .doc-back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      background-color: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      transition: all var(--duration-fast) var(--ease-snappy);
+    }
+    .doc-back-link:hover {
+      color: var(--accent-primary);
+      border-color: var(--accent-primary-border);
+      background-color: var(--accent-primary-soft);
+    }
+    .doc-hero {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .doc-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background-color: var(--accent-primary-soft);
+      border: 1px solid var(--accent-primary-border);
+      padding: 4px 10px;
+      border-radius: 9999px;
+      width: fit-content;
+    }
+    .doc-title {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--text-primary);
+      line-height: 1.25;
+    }
+    .doc-subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .step-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      position: relative;
+      box-shadow: var(--shadow-sm);
+    }
+    .step-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .step-number-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--accent-primary) 0%, #ea580c 100%);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+    }
+    .step-card-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+    .step-card-body {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      padding-left: 44px;
+    }
+    @media (max-width: 600px) {
+      .step-card-body {
+        padding-left: 0;
+      }
+    }
+    .code-snippet-box {
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .faq-section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      margin-top: var(--space-4);
+    }
+    .faq-card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .faq-question {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .faq-answer {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="doc-page-container">
+    
+    <!-- Top Nav -->
+    <header class="doc-header-nav">
+      <div class="brand-wrap">
+        <img src="/icons/icon.svg" alt="DayFlow Logo" class="brand-logo-img" width="28" height="28">
+        <h1 class="brand-title">Day<span class="brand-title-accent">Flow</span></h1>
+      </div>
+      <a href="/" class="doc-back-link">
+        <span data-icon="chevron-left" data-icon-size="16"></span>
+        <span>Kembali ke DayFlow</span>
+      </a>
+    </header>
+
+    <!-- Hero Title -->
+    <section class="doc-hero">
+      </div>
+      <h2 class="doc-title">Tata Cara Mendapatkan & Memasang Gemini API Key</h2>
+      <p class="doc-subtitle">
+        Panduan langkah demi langkah untuk mendapatkan API Key gratis langsung dari Google AI Studio dan memasukkannya ke dalam aplikasi DayFlow agar seluruh fitur AI aktif.
+      </p>
+    </section>
+
+    <!-- Centralized AI Gateway Notice -->
+    <div class="alert-banner alert-banner-info">
+      <div class="alert-banner-icon-wrap">
+        <span data-icon="bot" data-icon-size="18"></span>
+      </div>
+      <div class="alert-banner-content">
+        <span class="alert-banner-title">Arsitektur AI Terpusat (Bebas Input Key Bagi Pengguna)</span>
+        <span class="alert-banner-desc">DayFlow mendukung Serverless Gateway (Cloudflare Worker 100% gratis tanpa kartu kredit). Pengembang dapat menyimpan 1 API Key di serverless backend, sehingga seluruh pengguna umum dapat langsung menikmati asisten AI tanpa perlu memiliki atau memasukkan API Key sendiri.</span>
+      </div>
+    </div>
+
+    <!-- Quick Action Banner -->
+    <div class="alert-banner alert-banner-info">
+      <div class="alert-banner-icon-wrap">
+        <span data-icon="info" data-icon-size="18"></span>
+      </div>
+      <div class="alert-banner-content">
+        <span class="alert-banner-title">100% Gratis & Bebas Biaya</span>
+        <span class="alert-banner-desc">Google AI Studio menyediakan kuota gratis tanpa kartu kredit dengan batas 15 permintaan per menit (RPM), sangat memadai untuk jadwal harian pribadi.</span>
+      </div>
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-primary btn-sm alert-banner-action" style="text-decoration:none;">
+        Buka Google AI Studio
+        <span data-icon="arrowUpRight" data-icon-size="13"></span>
+      </a>
+    </div>
+
+    <!-- Step by Step Cards -->
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      
+      <!-- Langkah 1 -->
+      <div class="step-card">
+        <div class="step-card-header">
+          <div class="step-number-badge">1</div>
+          <h3 class="step-card-title">Kunjungi Google AI Studio</h3>
+        </div>
+        <div class="step-card-body">
+          <p>Buka situs resmi Google AI Studio pada peramban Anda. Masuk (<i>Sign In</i>) menggunakan akun Google / Gmail Anda.</p>
+          <div style="margin-top:10px;">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="text-decoration:none;">
+              Kunjungi aistudio.google.com/app/apikey
+              <span data-icon="arrowUpRight" data-icon-size="13"></span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Langkah 2 -->
+      <div class="step-card">
+        <div class="step-card-header">
+          <div class="step-number-badge">2</div>
+          <h3 class="step-card-title">Klik Tombol "Create API Key"</h3>
+        </div>
+        <div class="step-card-body">
+          <p>Setelah masuk ke halaman API Keys, klik tombol biru bertuliskan <b>"Create API key"</b> (atau <b>"Get API key"</b>).</p>
+          <p style="margin-top:6px;">Jika muncul pilihan project, pilih opsi default <b>"Create API key in default project"</b> atau pilih project Google Cloud yang Anda miliki.</p>
+        </div>
+      </div>
+
+      <!-- Langkah 3 -->
+      <div class="step-card">
+        <div class="step-card-header">
+          <div class="step-number-badge">3</div>
+          <h3 class="step-card-title">Salin Kunci API (Copy)</h3>
+        </div>
+        <div class="step-card-body">
+          <p>Setelah proses pembuatan selesai, sebuah jendela akan menampilkan deretan karakter unik. Klik tombol <b>Copy</b> di samping kunci tersebut.</p>
+          <p style="margin-top:6px;">Format kunci API Google umumnya diawali dengan karakter:</p>
+          <div class="code-snippet-box">
+            <span>AIzaSy... (sekitar 39 karakter)</span>
+            <span style="font-size:11px; color:var(--text-muted);">Contoh format</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Langkah 4 -->
+      <div class="step-card">
+        <div class="step-card-header">
+          <div class="step-number-badge">4</div>
+          <h3 class="step-card-title">Tempelkan ke DayFlow & Simpan</h3>
+        </div>
+        <div class="step-card-body">
+          <p>Kembali ke aplikasi DayFlow, buka tab <b>Setelan (Pengaturan)</b>.</p>
+          <p style="margin-top:6px;">Pada kartu <b>Gemini API Key</b>, tempelkan (<i>paste</i>) kode yang baru Anda salin ke dalam kolom input.</p>
+          <p style="margin-top:6px;">Klik tombol <b>Uji Koneksi Key</b> untuk memastikan status koneksi aktif, lalu tekan tombol <b>Simpan Pengaturan</b> di bagian bawah.</p>
+          <div style="margin-top:12px;">
+            <a href="/#settings" class="btn btn-primary btn-sm" style="text-decoration:none;">
+              Buka Pengaturan DayFlow Sekarang
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq-section">
+      <div class="section-title-wrap">
+        <span class="section-title">Pertanyaan Umum (FAQ)</span>
+      </div>
+
+      <div class="faq-card">
+        <span class="faq-question">Apakah API Key saya aman di DayFlow?</span>
+        <span class="faq-answer">Sangat aman. DayFlow beroperasi secara <i>local-first</i>. Kunci API Anda disimpan langsung di browser perangkat Anda (localStorage) dan hanya dikirimkan ke server resmi Google API (generativelanguage.googleapis.com) saat memproses permintaan AI. Tidak ada pihak ketiga yang memiliki akses ke kunci Anda.</span>
+      </div>
+
+      <div class="faq-card">
+        <span class="faq-question">Model Gemini apa saja yang didukung?</span>
+        <span class="faq-answer">DayFlow mendukung seluruh lini model mutakhir Gemini: Gemini 3.8 Flash (direkomendasikan), Gemini 3.5 Flash-Lite (hemat kuota), Gemini 3.6 Flash, dan Gemini 2.5 Flash. Anda dapat menggantinya kapan saja melalui menu Setelan.</span>
+      </div>
+
+      <div class="faq-card">
+        <span class="faq-question">Apa yang harus dilakukan jika muncul error kuota (Quota Exceeded)?</span>
+        <span class="faq-answer">Tunggu 1 hingga 2 menit agar batas RPM (Request Per Minute) Google ter-reset otomatis, atau pilih model <b>Gemini 3.5 Flash-Lite</b> di tab Pengaturan yang memiliki batas kuota lebih longgar.</span>
+      </div>
+    </section>
+
+    <!-- Documentation External Links -->
+    <div style="display:flex; justify-content:center; gap:12px; margin-top:var(--space-4); flex-wrap:wrap;">
+      <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="text-decoration:none;">
+        Dokumentasi Resmi Google AI
+        <span data-icon="arrowUpRight" data-icon-size="13"></span>
+      </a>
+      <a href="/" class="btn btn-secondary btn-sm" style="text-decoration:none;">
+        Kembali ke Beranda DayFlow
+      </a>
+    </div>
+
+  </div>
+
+  <!-- Icons renderer -->
+  <script type="module">
+    import { renderIcons } from '/js/icons.js';
+    
+    // Apply user saved theme if available
+    try {
+      const saved = localStorage.getItem('dayflow_settings_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.theme === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+        } else if (parsed.theme === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      }
+    } catch(e) {}
+
+    renderIcons();
+  </script>
+</body>
+</html>

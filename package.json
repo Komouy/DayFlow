@@ -1,0 +1,25 @@
+{
+  "name": "dayflow",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DayFlow - Asisten Jadwal & Rencana Harian AI dengan Gemini",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && npm run build:bundle",
+    "build:bundle": "npx esbuild js/app.js --bundle --outfile=js/bundle.js --format=iife && npx esbuild js/app.js --bundle --outfile=js/bundle.v5.js --format=iife",
+    "preview": "vite preview",
+    "start": "vite preview"
+  },
+  "keywords": [
+    "pwa",
+    "gemini-ai",
+    "productivity",
+    "schedule",
+    "anti-slop"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^8.3.4"
+  }
+}

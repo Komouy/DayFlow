@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Production build output
+dist/
+
+# Firebase local cache
+.firebase/
+
+# Local logs & scratch scripts
+*.log
+scratch/
+brain/
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db

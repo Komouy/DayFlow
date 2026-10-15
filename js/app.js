@@ -361,6 +361,12 @@ class AppController {
       testApiBtn.addEventListener('click', () => this.handleTestApiKey());
     }
 
+    // Clear API key button
+    const clearKeyBtn = document.getElementById('btn-clear-api-key');
+    if (clearKeyBtn) {
+      clearKeyBtn.addEventListener('click', () => this.handleClearSavedApiKey());
+    }
+
     // Toggle API key visibility
     const toggleKeyBtn = document.getElementById('btn-toggle-key-visibility');
     const apiKeyInput = document.getElementById('setting-api-key');

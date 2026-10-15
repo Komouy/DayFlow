@@ -213,6 +213,14 @@ export const settingsViewMethods = {
     }
   },
 
+  handleClearSavedApiKey() {
+    state.updateSettings({ apiKey: '' });
+    const apiInput = document.getElementById('setting-api-key');
+    if (apiInput) apiInput.value = '';
+    this.renderSettingsView();
+    notifications.showToast('API Key pribadi telah dihapus dari peramban ini. DayFlow kini aktif menggunakan AI Terpusat.', 'success', 5000);
+  },
+
   handleExportData() {
     const backup = {
       version: 1,

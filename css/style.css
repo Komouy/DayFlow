@@ -4340,3 +4340,89 @@ button.btn-add-category-pill {
   object-fit: cover;
   display: block;
 }
+
+/* Progressive Disclosure Accordion for Modal Schedule */
+.advanced-options-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-snappy);
+}
+
+.advanced-options-details[open] {
+  border-color: var(--border-hover);
+}
+
+.advanced-options-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: color var(--duration-fast) var(--ease-snappy), background-color var(--duration-fast) var(--ease-snappy);
+}
+
+.advanced-options-summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-options-summary:hover {
+  color: var(--text-primary);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="light"] .advanced-options-summary:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.advanced-options-summary .advanced-summary-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-fast) var(--ease-snappy);
+}
+
+.advanced-options-details[open] .advanced-summary-chevron {
+  transform: rotate(180deg);
+}
+
+.advanced-options-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Sleek Quick AI Prompt Strip */
+.ai-quick-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-snappy);
+  user-select: none;
+}
+
+.ai-quick-strip:hover {
+  background-color: var(--bg-surface-elevated);
+  border-color: var(--border-hover);
+  border-left-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.ai-quick-strip:active {
+  transform: scale(0.98);
+}
+

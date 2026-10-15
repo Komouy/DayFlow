@@ -2025,6 +2025,11 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       if (prioRadio) prioRadio.checked = true;
       const recRadio = modal.querySelector(`input[name="sch-recurrence-radio"][value="${currentRecurrence}"]`);
       if (recRadio) recRadio.checked = true;
+      const advancedDetails = document.getElementById("sch-advanced-options");
+      if (advancedDetails) {
+        const isCustomized = currentCategory && currentCategory.toLowerCase() !== "kerja" || currentPriority && currentPriority !== "medium" || currentRecurrence && currentRecurrence !== "none" || currentDeadline && currentDeadline.trim() !== "";
+        advancedDetails.open = Boolean(isCustomized);
+      }
       modal.classList.add("open");
       setTimeout(() => inputTitle.focus(), 150);
     },

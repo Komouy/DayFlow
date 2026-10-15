@@ -84,6 +84,16 @@ export const modalMethods = {
     const recRadio = modal.querySelector(`input[name="sch-recurrence-radio"][value="${currentRecurrence}"]`);
     if (recRadio) recRadio.checked = true;
 
+    // Auto-expand advanced options if item has custom configurations (or keep collapsed for clean fast entry)
+    const advancedDetails = document.getElementById('sch-advanced-options');
+    if (advancedDetails) {
+      const isCustomized = (currentCategory && currentCategory.toLowerCase() !== 'kerja') ||
+                           (currentPriority && currentPriority !== 'medium') ||
+                           (currentRecurrence && currentRecurrence !== 'none') ||
+                           (currentDeadline && currentDeadline.trim() !== '');
+      advancedDetails.open = Boolean(isCustomized);
+    }
+
     modal.classList.add('open');
     setTimeout(() => inputTitle.focus(), 150);
   },

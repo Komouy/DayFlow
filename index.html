@@ -126,7 +126,9 @@
         'check-circle': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
         x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
         'chevrons-right': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>',
-        refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>'
+        refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>',
+        sliders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="1" x2="7" y1="14" y2="14"/><line x1="9" x2="15" y1="8" y2="8"/><line x1="17" x2="23" y1="16" y2="16"/></svg>',
+        'chevron-down': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>'
       };
       function initQuickIcons() {
         document.querySelectorAll('[data-icon]').forEach(function(el) {
@@ -228,13 +230,6 @@
           </div>
         </div>
 
-        <!-- Anti-Slop Project Overview & Purpose (Refined Thin Typography) -->
-        <div id="today-project-intro" class="today-project-intro">
-          <h3 class="today-project-intro-title"><span class="today-project-intro-accent">DayFlow</span> — Asisten Jadwal & Rencana Harian AI</h3>
-          <p class="today-project-intro-desc">
-            Ruang kerja harian yang dirancang tenang dan bebas distraksi. Membantu Anda merapikan jadwal padat, menyusun rencana aksi terstruktur berbasis Gemini AI, serta mengelola agenda penting dalam satu alur yang teratur.
-          </p>
-        </div>
 
                 <!-- Synchronous Zero-Latency Date & Greeting Init (Prevents any 'Memuat' text freeze) -->
         <script>
@@ -327,11 +322,11 @@
                 <span class="badge-counter" id="today-stats-counter">0 / 0</span>
               </div>
               <div style="display:flex; align-items:center; gap:var(--space-2);">
-                <button class="btn btn-secondary btn-sm" id="btn-share-today">
+                <button class="btn btn-secondary btn-sm" id="btn-share-today" title="Bagikan Agenda Hari Ini">
                   <span data-icon="share" data-icon-size="14"></span>
-                  Bagikan Agenda
+                  Bagikan
                 </button>
-                <button class="btn btn-secondary btn-sm" id="btn-today-add-schedule" onclick="window.dayflowApp.openScheduleModal()">
+                <button class="btn btn-primary btn-sm" id="btn-today-add-schedule" onclick="window.dayflowApp.openScheduleModal()">
                   <span data-icon="plus" data-icon-size="15"></span>
                   Tambah Jadwal
                 </button>
@@ -345,35 +340,29 @@
           </div>
 
           <!-- Secondary Column: Quick Action & Note Cards -->
-          <div style="display:flex; flex-direction:column; gap:var(--space-5);">
-            <!-- Quick AI Assistant Card -->
-            <div class="card card-elevated" style="display:flex; flex-direction:column; gap:12px; border-left:3px solid var(--accent-primary);">
-              <div style="display:flex; align-items:center; justify-content:space-between;">
-                <span class="section-title" style="font-size:13px; display:inline-flex; align-items:center; gap:6px;">
-                  <span data-icon="bot" data-icon-size="15" class="text-orange"></span>
+          <div style="display:flex; flex-direction:column; gap:var(--space-4);">
+            <!-- Sleek AI Assistant Shortcut Strip -->
+            <div class="ai-quick-strip" id="btn-today-susun-jadwal" role="button" tabindex="0" title="Buka Asisten AI untuk susun jadwal & konsultasi">
+              <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                <span data-icon="bot" data-icon-size="18" class="text-orange" style="flex-shrink:0;"></span>
+                <span style="font-size:13px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                   Tanya Asisten AI & Susun Jadwal
                 </span>
               </div>
-              <p class="text-muted" style="font-size:12px; line-height:1.5;">
-                Punya rencana atau ingin atur hari? Chat langsung dengan asisten untuk konsultasi, buat jadwal berulang, atau susun agendamu seketika.
-              </p>
-              <button class="btn btn-primary btn-sm" id="btn-today-susun-jadwal" style="width:100%;">
-                <span data-icon="bot" data-icon-size="14"></span>
-                Buka Asisten AI & Buat Jadwal
-              </button>
+              <span data-icon="chevron-right" data-icon-size="16" style="color:var(--text-muted); flex-shrink:0;"></span>
             </div>
 
             <!-- Quick Note Card -->
-            <div class="card" style="display:flex; flex-direction:column; gap:14px;">
+            <div class="card" style="display:flex; flex-direction:column; gap:10px; padding:12px 14px;">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <span class="section-title" style="font-size:13px;">Memo Cepat</span>
-                <button class="btn btn-ghost btn-sm" id="btn-today-view-notes" onclick="window.dayflowApp.switchTab('notes')" style="font-size:11px;">
+                <button class="btn btn-ghost btn-xs" id="btn-today-view-notes" onclick="window.dayflowApp.switchTab('notes')" style="font-size:11px;">
                   Lihat Semua
                 </button>
               </div>
-              <textarea id="today-quick-note-input" class="input-control textarea-control" style="min-height:80px; font-size:13px;" placeholder="Tulis catatan atau memo kilat..."></textarea>
+              <textarea id="today-quick-note-input" class="input-control textarea-control" style="min-height:64px; font-size:12.5px; padding:8px 10px;" placeholder="Tulis catatan atau memo kilat..."></textarea>
               <div style="display:flex; justify-content:flex-end;">
-                <button class="btn btn-primary btn-sm" id="btn-save-today-quick-note">
+                <button class="btn btn-primary btn-xs" id="btn-save-today-quick-note">
                   Simpan Catatan
                 </button>
               </div>
@@ -403,7 +392,7 @@
         <!-- Sleek Week Strip Selector Card -->
         <div class="week-strip-card">
           <div class="week-strip-header">
-            <div class="week-strip-header-row">
+            <div class="week-strip-header-row" style="align-items:center;">
               <span class="section-title" id="week-strip-month-label" style="font-size:13.5px; font-weight:700;">Oktober 2026</span>
               <div style="display:flex; gap:5px; align-items:center;">
                 <button class="btn btn-secondary btn-xs btn-icon" id="btn-week-prev" aria-label="Minggu Lalu" title="Minggu Sebelumnya" style="width:30px; height:30px;">
@@ -415,10 +404,11 @@
                 <button class="btn btn-secondary btn-xs btn-icon" id="btn-week-next" aria-label="Minggu Depan" title="Minggu Berikutnya" style="width:30px; height:30px;">
                   <span data-icon="chevron-right" data-icon-size="14"></span>
                 </button>
+                <label for="schedule-date-filter" class="btn btn-secondary btn-xs btn-icon" title="Pilih Tanggal Kalender" style="width:30px; height:30px; cursor:pointer; position:relative; margin:0; display:inline-flex; align-items:center; justify-content:center;">
+                  <span data-icon="calendar" data-icon-size="13"></span>
+                  <input type="date" id="schedule-date-filter" style="position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer;">
+                </label>
               </div>
-            </div>
-            <div style="width:100%;">
-              <input type="date" id="schedule-date-filter" class="input-control" style="width:100%; min-height:34px; height:34px; padding:0 10px; font-size:12px;">
             </div>
           </div>
 
@@ -457,28 +447,21 @@
 
         <!-- Conversational Chat Stream -->
         <div class="card" style="display:flex; flex-direction:column; gap:12px; height:600px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; width:100%; min-width:0;">
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span data-icon="bot" data-icon-size="16" class="text-orange"></span>
-              <span class="section-title" style="font-size:13px; white-space:nowrap; margin:0;">Percakapan & Rencana Agenda</span>
-            </div>
-          </div>
-
           <div class="quick-prompts">
             <button class="prompt-chip" data-prompt="Setiap hari jam 06:00 olahraga lari pagi">
-              + Jadwal Berulang Harian
+              Jadwal Berulang
             </button>
             <button class="prompt-chip" data-prompt="Susun jadwal fokus kerja dan istirahat hari ini mulai jam 08:30">
-              Susun Jadwal Hari Ini
+              Susun Hari Ini
             </button>
             <button class="prompt-chip" data-prompt="Besok jam 5 sore kumpul tugas fisika bab 2 paling lambat">
-              + Tugas Bertenggat (Deadline)
+              Tugas Bertenggat
             </button>
             <button class="prompt-chip" data-prompt="Bantu aku merapikan prioritas tugasku hari ini.">
-              Prioritaskan Hari Ini
+              Prioritas
             </button>
             <button class="prompt-chip" data-prompt="Bagaimana strategi time blocking yang baik agar tidak lelah?">
-              Tips Time Blocking
+              Tips Waktu
             </button>
           </div>
 
@@ -489,7 +472,7 @@
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding:0 2px;">
             <label class="chat-auto-save-control">
               <input type="checkbox" id="chat-auto-save-toggle">
-              <span>Otomatis simpan ke agenda saat asisten menyusun jadwal</span>
+              <span>Simpan otomatis ke agenda</span>
             </label>
           </div>
 
@@ -1084,125 +1067,137 @@
             <input type="hidden" id="sch-input-duration" value="30">
           </div>
 
-          <!-- 4. Kategori Agenda -->
-          <div class="form-group">
-            <label class="form-label" style="margin-bottom:6px;">Kategori</label>
-            <div class="category-radio-grid" id="sch-category-radio-group">
-              <label class="category-radio-item">
-                <input type="radio" name="sch-category-radio" value="Kerja" checked>
-                <span class="category-radio-badge">
-                  <span class="category-indicator dot-kerja"></span>
-                  Kerja
-                </span>
-              </label>
-              <label class="category-radio-item">
-                <input type="radio" name="sch-category-radio" value="Fokus">
-                <span class="category-radio-badge">
-                  <span class="category-indicator dot-fokus"></span>
-                  Fokus
-                </span>
-              </label>
-              <label class="category-radio-item">
-                <input type="radio" name="sch-category-radio" value="Pribadi">
-                <span class="category-radio-badge">
-                  <span class="category-indicator dot-pribadi"></span>
-                  Pribadi
-                </span>
-              </label>
-              <label class="category-radio-item">
-                <input type="radio" name="sch-category-radio" value="Kesehatan">
-                <span class="category-radio-badge">
-                  <span class="category-indicator dot-kesehatan"></span>
-                  Kesehatan
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 5. Tingkat Prioritas -->
-          <div class="form-group">
-            <label class="form-label" style="margin-bottom:6px;">Prioritas</label>
-            <div class="priority-radio-grid" id="sch-priority-radio-group">
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-priority-radio" value="high">
-                <span class="priority-radio-badge">
-                  <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>
-                  Tinggi (P1)
-                </span>
-              </label>
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-priority-radio" value="medium" checked>
-                <span class="priority-radio-badge">
-                  <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#f59e0b;"></span>
-                  Sedang (P2)
-                </span>
-              </label>
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-priority-radio" value="low">
-                <span class="priority-radio-badge">
-                  <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#9ca3af;"></span>
-                  Rendah (P3)
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 6. Perulangan Jadwal (Recurrence) -->
-          <div class="form-group">
-            <label class="form-label" style="margin-bottom:6px;">Ulangi Jadwal</label>
-            <div class="priority-radio-grid" id="sch-recurrence-radio-group" style="grid-template-columns: repeat(3, 1fr); gap:6px;">
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-recurrence-radio" value="none" checked>
-                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
-                  Hanya Sekali
-                </span>
-              </label>
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-recurrence-radio" value="daily">
-                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
-                  Setiap Hari
-                </span>
-              </label>
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-recurrence-radio" value="weekdays">
-                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
-                  Hari Kerja (Sen-Jum)
-                </span>
-              </label>
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-recurrence-radio" value="weekly">
-                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
-                  Mingguan
-                </span>
-              </label>
-              <label class="priority-radio-item">
-                <input type="radio" name="sch-recurrence-radio" value="monthly">
-                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
-                  Bulanan
-                </span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 7. Opsi Tambahan: Tenggat & Pengingat -->
-          <div class="modal-subcard">
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" for="sch-input-deadline" style="font-size:12px; margin-bottom:4px;">Tenggat Waktu / Deadline (Opsional)</label>
-              <input type="date" id="sch-input-deadline" class="input-control" style="min-height:36px; height:36px; font-size:12px;">
-            </div>
-            <div class="settings-row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-subtle);">
-              <div class="settings-row-text">
-                <span class="settings-row-title" style="font-size:12.5px;">Pengingat Otomatis</span>
-                <span class="settings-row-desc" style="font-size:11px;">Notifikasi & bel sebelum waktu mulai</span>
+          <!-- 4. Pengaturan Lanjutan (Progressive Disclosure) -->
+          <details id="sch-advanced-options" class="advanced-options-details">
+            <summary class="advanced-options-summary">
+              <span style="display:inline-flex; align-items:center; gap:8px;">
+                <span data-icon="sliders" data-icon-size="14"></span>
+                <span>Pengaturan Tambahan (Kategori, Pengulangan, Prioritas)</span>
+              </span>
+              <span class="advanced-summary-chevron" data-icon="chevron-down" data-icon-size="14"></span>
+            </summary>
+            <div class="advanced-options-body">
+              <!-- Kategori Agenda -->
+              <div class="form-group">
+                <label class="form-label" style="margin-bottom:6px;">Kategori</label>
+                <div class="category-radio-grid" id="sch-category-radio-group">
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Kerja" checked>
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-kerja"></span>
+                      Kerja
+                    </span>
+                  </label>
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Fokus">
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-fokus"></span>
+                      Fokus
+                    </span>
+                  </label>
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Pribadi">
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-pribadi"></span>
+                      Pribadi
+                    </span>
+                  </label>
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Kesehatan">
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-kesehatan"></span>
+                      Kesehatan
+                    </span>
+                  </label>
+                </div>
               </div>
-              <label class="toggle-switch" for="sch-toggle-reminder" aria-label="Aktifkan Pengingat">
-                <input type="checkbox" id="sch-toggle-reminder" checked class="toggle-input">
-                <span class="toggle-track">
-                  <span class="toggle-thumb"></span>
-                </span>
-              </label>
+
+              <!-- Tingkat Prioritas -->
+              <div class="form-group">
+                <label class="form-label" style="margin-bottom:6px;">Prioritas</label>
+                <div class="priority-radio-grid" id="sch-priority-radio-group">
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-priority-radio" value="high">
+                    <span class="priority-radio-badge">
+                      <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>
+                      Tinggi (P1)
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-priority-radio" value="medium" checked>
+                    <span class="priority-radio-badge">
+                      <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#f59e0b;"></span>
+                      Sedang (P2)
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-priority-radio" value="low">
+                    <span class="priority-radio-badge">
+                      <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#9ca3af;"></span>
+                      Rendah (P3)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Perulangan Jadwal (Recurrence) -->
+              <div class="form-group">
+                <label class="form-label" style="margin-bottom:6px;">Ulangi Jadwal</label>
+                <div class="priority-radio-grid" id="sch-recurrence-radio-group" style="grid-template-columns: repeat(3, 1fr); gap:6px;">
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="none" checked>
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Hanya Sekali
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="daily">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Setiap Hari
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="weekdays">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Hari Kerja (Sen-Jum)
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="weekly">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Mingguan
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="monthly">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Bulanan
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Tenggat & Pengingat -->
+              <div class="modal-subcard">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" for="sch-input-deadline" style="font-size:12px; margin-bottom:4px;">Tenggat Waktu / Deadline (Opsional)</label>
+                  <input type="date" id="sch-input-deadline" class="input-control" style="min-height:36px; height:36px; font-size:12px;">
+                </div>
+                <div class="settings-row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-subtle);">
+                  <div class="settings-row-text">
+                    <span class="settings-row-title" style="font-size:12.5px;">Pengingat Otomatis</span>
+                    <span class="settings-row-desc" style="font-size:11px;">Notifikasi & bel sebelum waktu mulai</span>
+                  </div>
+                  <label class="toggle-switch" for="sch-toggle-reminder" aria-label="Aktifkan Pengingat">
+                    <input type="checkbox" id="sch-toggle-reminder" checked class="toggle-input">
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                  </label>
+                </div>
+              </div>
             </div>
-          </div>
+          </details>
 
           <!-- Action Buttons -->
           <div style="display:flex; gap:10px; margin-top:4px;">

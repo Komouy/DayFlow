@@ -1,10 +1,10 @@
 /**
- * DayFlow Service Worker v6.5
- * Resilient Stale-While-Revalidate offline cache & instant mobile startup.
- * Zero-hang, auto-cache purge on upgrade guarantee.
+ * DayFlow Service Worker v6.6
+ * Resilient Network-First for HTML Navigation & Instant Cache for Static Assets.
+ * Zero-hang, immediate redeploy visibility guarantee.
  */
 
-const CACHE_NAME = 'dayflow-v6.5';
+const CACHE_NAME = 'dayflow-v6.6';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -57,15 +57,32 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Stale-While-Revalidate with Instant Cache Return:
+// Resilient Network-First for HTML navigation, Stale-While-Revalidate for static assets
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (!event.request.url.startsWith('http')) return;
   if (event.request.url.includes('googleapis.com')) return;
 
+  // 1. Navigation requests (HTML): Network-First guarantees immediate redeploy updates.
+  // Falls back to offline cached /index.html if user is offline.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('/index.html', { ignoreSearch: true }))
+    );
+    return;
+  }
+
+  // 2. Static Assets: Stale-While-Revalidate with Instant Cache Return
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
-      // Background network fetch to keep cache up to date
       const networkFetch = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
@@ -74,25 +91,15 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => {
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html', { ignoreSearch: true });
-          }
-          return null;
-        });
+        .catch(() => null);
 
-      // If cached response exists, return immediately for instant UI
       if (cachedResponse) {
         event.waitUntil(networkFetch);
         return cachedResponse;
       }
 
-      // Otherwise wait for network fetch
       return networkFetch.then((res) => {
         if (res) return res;
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html', { ignoreSearch: true });
-        }
         return new Response('Network unavailable', { status: 408, headers: { 'Content-Type': 'text/plain' } });
       });
     })

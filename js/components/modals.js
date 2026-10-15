@@ -437,19 +437,7 @@ export const modalMethods = {
     renderIcons(modal);
   },
 
-  openAiPlanModal() {
-    this.closeAllModals();
-    const modal = document.getElementById('modal-ai-plan');
-    if (!modal) return;
 
-    modal.classList.add('open');
-    renderIcons(modal);
-
-    const textarea = document.getElementById('ai-plan-text');
-    if (textarea) {
-      setTimeout(() => textarea.focus(), 120);
-    }
-  },
 
   closeAllModals() {
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));

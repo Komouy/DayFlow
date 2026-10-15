@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheet (Versioned & Inlined Design Tokens) -->
-  <link rel="stylesheet" href="/css/style.v5.css?v=6.5">
+  <link rel="stylesheet" href="/css/style.v5.css?v=6.6">
 
   <!-- Early Safe Proxy: Guarantees button clicks and tabs work immediately with zero latency -->
   <script>
@@ -30,7 +30,7 @@
     if ('caches' in window) {
       caches.keys().then(function(keys) {
         keys.forEach(function(k) {
-          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.5') {
+          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.6') {
             console.log('[DayFlow] Purging obsolete cache:', k);
             caches.delete(k);
           }
@@ -39,7 +39,11 @@
     }
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').catch(function(err) {
+        navigator.serviceWorker.register('/sw.js').then(function(reg) {
+          if (reg) {
+            reg.update();
+          }
+        }).catch(function(err) {
           console.warn('SW registration:', err);
         });
       });
@@ -439,11 +443,11 @@
       <section id="view-ai-plan" class="view-tab hidden">
         <div class="page-control-bar">
           <div class="section-title-wrap">
-            <span class="section-title">Asisten AI DayFlow (Chat & Jadwal Terpadu)</span>
+            <span class="section-title">Tanya Asisten AI & Susun Jadwal</span>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-open-ai-plan-modal" style="font-size:12px;">
-            <span data-icon="calendar" data-icon-size="14"></span>
-            Input Teks Cepat
+          <button class="btn btn-ghost btn-sm" onclick="window.dayflowApp.clearChat()" style="font-size:11px; padding:0 10px; min-height:30px; white-space:nowrap;">
+            <span data-icon="trash" data-icon-size="13"></span>
+            Bersihkan Chat
           </button>
         </div>
 
@@ -452,11 +456,8 @@
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; width:100%; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px;">
               <span data-icon="bot" data-icon-size="16" class="text-orange"></span>
-              <span class="section-title" style="font-size:13px; white-space:nowrap; margin:0;">Tanya Asisten AI</span>
+              <span class="section-title" style="font-size:13px; white-space:nowrap; margin:0;">Percakapan & Rencana Agenda</span>
             </div>
-            <button class="btn btn-ghost btn-sm" onclick="window.dayflowApp.clearChat()" style="font-size:11px; padding:0 8px; min-height:30px; white-space:nowrap;">
-              Bersihkan Chat
-            </button>
           </div>
 
           <div class="quick-prompts">
@@ -1434,45 +1435,7 @@
       </div>
     </div>
 
-    <!-- Modal: Susun Jadwal dari Kalimat Bebas (AI Extractor) -->
-    <div id="modal-ai-plan" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-ai-plan-title">
-      <div class="bottom-sheet" style="max-width:560px; max-height:88vh; overflow-y:auto;">
-        <div class="sheet-handle"></div>
-        <div class="sheet-header">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span data-icon="calendar" data-icon-size="16" class="text-orange"></span>
-            <h3 class="sheet-title" id="modal-ai-plan-title" style="margin:0; font-size:14px; font-weight:600;">
-              Susun Jadwal dari Kalimat Bebas
-            </h3>
-          </div>
-          <button type="button" class="btn btn-ghost btn-xs btn-icon btn-close-modal" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup">
-            <span data-icon="x" data-icon-size="16"></span>
-          </button>
-        </div>
 
-        <div class="sheet-body" style="display:flex; flex-direction:column; gap:12px;">
-          <p class="text-muted" style="font-size:12px; margin:0; line-height:1.5;">
-            Tuliskan rencana kegiatan santai atau rutinitasmu. AI otomatis memparafrasekan kalimat menjadi judul ringkas, mendeteksi jadwal berulang (harian/mingguan), tenggat waktu (deadline), dan menentukan skala prioritas.
-          </p>
-
-          <textarea id="ai-plan-text" class="input-control textarea-control" style="min-height:130px; font-size:13px;" placeholder="Contoh: Setiap hari jam 06:00 olahraga pagi, besok kumpul tugas fisika bab 2 jam 5 sore paling lambat, tiap senin jam 09:00 evaluasi tim..."></textarea>
-
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer; user-select:none;">
-              <input type="checkbox" id="ai-auto-save-schedule" checked style="accent-color:var(--accent-primary); width:15px; height:15px; cursor:pointer;">
-              <span>Langsung simpan ke jadwal</span>
-            </label>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-parse-ai-schedule">
-              <span data-icon="calendar" data-icon-size="14"></span>
-              Ekstrak & Susun Jadwal
-            </button>
-          </div>
-
-          <!-- Preview of Extracted AI Schedules if auto-save is unchecked -->
-          <div id="ai-extracted-preview" class="hidden" style="margin-top:8px;"></div>
-        </div>
-      </div>
-    </div>
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>

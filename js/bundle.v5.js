@@ -2302,17 +2302,6 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       modal.classList.add("open");
       renderIcons(modal);
     },
-    openAiPlanModal() {
-      this.closeAllModals();
-      const modal = document.getElementById("modal-ai-plan");
-      if (!modal) return;
-      modal.classList.add("open");
-      renderIcons(modal);
-      const textarea = document.getElementById("ai-plan-text");
-      if (textarea) {
-        setTimeout(() => textarea.focus(), 120);
-      }
-    },
     closeAllModals() {
       document.querySelectorAll(".modal-overlay").forEach((m) => m.classList.remove("open"));
       this.editingScheduleId = null;
@@ -3568,184 +3557,6 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         renderIcons(chatHistoryEl);
         chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
       }
-      const previewContainer = document.getElementById("ai-extracted-preview");
-      if (previewContainer) {
-        if (this.pendingAiSchedules.length > 0) {
-          previewContainer.classList.remove("hidden");
-          const firstDate = this.pendingAiSchedules[0]?.date || getLocalDateString();
-          const displayDate = (/* @__PURE__ */ new Date(firstDate + "T00:00:00")).toLocaleDateString("id-ID", {
-            weekday: "long",
-            day: "numeric",
-            month: "long",
-            year: "numeric"
-          });
-          const totalItems = this.pendingAiSchedules.length;
-          const deadlineItems = this.pendingAiSchedules.filter((s) => s.deadline).length;
-          previewContainer.innerHTML = `
-          <div class="card card-elevated" style="display:flex; flex-direction:column; gap:12px; border:1px solid var(--accent-primary);">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-              <div>
-                <span class="font-medium" style="font-size:14px; display:block;">Hasil Ekstraksi & Parafrase AI (${totalItems} item)</span>
-                <span class="text-muted" style="font-size:11px; display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:2px;">
-                  <span>Agenda: ${displayDate}</span>
-                  <span>\u2022</span>
-                  ${deadlineItems > 0 ? `<span class="deadline-badge is-urgent" style="font-size:10px; padding:1px 6px;">${getIcon("clock", "", 10)} ${deadlineItems} Tugas Bertenggat (Deadline)</span>` : `<span>Jadwal Rutin</span>`}
-                </span>
-              </div>
-              <button class="btn btn-primary btn-sm" id="btn-save-all-extracted">
-                ${getIcon("check", "", 14)} Simpan Semua ke Jadwal
-              </button>
-            </div>
-            <div class="timeline-list">
-              ${this.pendingAiSchedules.map((item, idx) => {
-            let deadlineBadge = "";
-            if (item.deadline) {
-              deadlineBadge = `
-                    <span class="deadline-badge is-urgent" style="font-size:10px; padding:2px 6px; display:inline-flex; align-items:center; gap:3px;">
-                      ${getIcon("clock", "", 10)} Tenggat: ${item.deadline}
-                    </span>
-                  `;
-            }
-            let priorityBadge = "";
-            if (item.priority === "high") {
-              priorityBadge = `
-                    <span style="font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(239,68,68,0.12); color:var(--status-danger); border:1px solid rgba(239,68,68,0.25); display:inline-flex; align-items:center; gap:3px; font-weight:600;">
-                      ${getIcon("alert-triangle", "", 10)} Prioritas Tinggi
-                    </span>
-                  `;
-            }
-            let recurrenceBadge = "";
-            if (item.recurrence && item.recurrence !== "none") {
-              const recLabels = {
-                daily: "Tiap Hari",
-                weekdays: "Hari Kerja",
-                weekly: "Mingguan",
-                monthly: "Bulanan"
-              };
-              const label = recLabels[item.recurrence] || "Berulang";
-              recurrenceBadge = `
-                    <span class="recurrence-badge" style="font-size:10px; padding:2px 6px;">
-                      ${getIcon("repeat", "", 10)} ${label}
-                    </span>
-                  `;
-            }
-            return `
-                  <div class="schedule-card" style="padding: 10px 12px; display:flex; align-items:center; gap:10px;">
-                    <div class="tabular-nums text-orange" style="font-size: 13px; font-weight:600; min-width:44px;">${item.time}</div>
-                    <div class="schedule-info" style="flex:1; min-width:0;">
-                      <div class="schedule-title" style="font-size: 13px; font-weight:600;">${escapeHtml(item.title)}</div>
-                      <div class="schedule-time-meta" style="font-size: 11px; margin-top:3px; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
-                        <span>${item.duration}m</span>
-                        <span>\u2022</span>
-                        <span class="schedule-category-badge">${escapeHtml(item.category)}</span>
-                        ${recurrenceBadge}
-                        ${deadlineBadge}
-                        ${priorityBadge}
-                      </div>
-                    </div>
-                    <button class="btn btn-ghost btn-sm" data-remove-extracted="${idx}" aria-label="Batal" title="Hapus kegiatan">
-                      ${getIcon("x", "", 14)}
-                    </button>
-                  </div>
-                `;
-          }).join("")}
-            </div>
-          </div>
-        `;
-          document.getElementById("btn-save-all-extracted")?.addEventListener("click", () => {
-            const itemsToSave = [...this.pendingAiSchedules];
-            this.pendingAiSchedules = [];
-            const added = state.addSchedules(itemsToSave);
-            if (added && added.length > 0) {
-              const targetDate = added[0].date || getLocalDateString();
-              this.selectedScheduleDate = targetDate;
-              this.selectedCategory = "all";
-              const dlCount = added.filter((s) => s.deadline).length;
-              const toastMsg = dlCount > 0 ? `${added.length} jadwal disimpan (${dlCount} tugas deadline otomatis dideteksi)!` : `${added.length} jadwal berhasil disimpan ke agenda!`;
-              notifications.showToast(toastMsg, "success");
-              this.closeAllModals();
-              this.renderAiPlanView();
-              setTimeout(() => this.switchTab("schedule"), 400);
-            }
-          });
-          previewContainer.querySelectorAll("[data-remove-extracted]").forEach((btn) => {
-            btn.addEventListener("click", () => {
-              const idx = parseInt(btn.getAttribute("data-remove-extracted"), 10);
-              this.pendingAiSchedules.splice(idx, 1);
-              this.renderAiPlanView();
-            });
-          });
-        } else {
-          previewContainer.classList.add("hidden");
-          previewContainer.innerHTML = "";
-        }
-      }
-    },
-    async handleAiScheduleExtraction() {
-      const inputEl = document.getElementById("ai-plan-text");
-      const text = inputEl ? inputEl.value.trim() : "";
-      if (!text) {
-        notifications.showToast("Tuliskan rencana kegiatan atau tugasmu terlebih dahulu.", "warning");
-        return;
-      }
-      const autoSaveCheckbox = document.getElementById("ai-auto-save-schedule");
-      const shouldAutoSave = autoSaveCheckbox ? autoSaveCheckbox.checked : true;
-      const btn = document.getElementById("btn-parse-ai-schedule");
-      const originalText = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = `<span class="spinner"></span> Memproses & Memparafrasekan...`;
-      try {
-        const todayDate = getLocalDateString();
-        let items = null;
-        if (GeminiService.isAiReady()) {
-          try {
-            items = await GeminiService.parseNaturalSchedule(text, todayDate);
-          } catch (aiErr) {
-            console.warn("Gemini extraction failed, using smart offline fallback:", aiErr);
-            items = this.extractSchedulesFromText(text, todayDate);
-            if (!items || items.length === 0) throw aiErr;
-          }
-        } else {
-          items = this.extractSchedulesFromText(text, todayDate);
-        }
-        if (!items || items.length === 0) {
-          notifications.showToast('Tidak ada kegiatan atau waktu yang berhasil dikenali. Contoh: "besok jam 5 sore kumpul tugas fisika bab 2 paling lambat"', "warning", 5e3);
-          return;
-        }
-        const deadlineCount = items.filter((s) => s.deadline).length;
-        if (shouldAutoSave) {
-          const added = state.addSchedules(items);
-          this.pendingAiSchedules = [];
-          inputEl.value = "";
-          const targetDate = added[0]?.date || todayDate;
-          this.selectedScheduleDate = targetDate;
-          this.selectedCategory = "all";
-          const formattedDate = (/* @__PURE__ */ new Date(targetDate + "T00:00:00")).toLocaleDateString("id-ID", {
-            weekday: "short",
-            day: "numeric",
-            month: "short"
-          });
-          const toastMsg = deadlineCount > 0 ? `${added.length} jadwal tersimpan (${deadlineCount} tugas deadline otomatis diparafrasekan & diberi prioritas tinggi)!` : `${added.length} jadwal berhasil dibuat dan langsung disimpan untuk ${formattedDate}!`;
-          notifications.showToast(toastMsg, "success", 4500);
-          this.closeAllModals();
-          this.renderAiPlanView();
-          setTimeout(() => this.switchTab("schedule"), 400);
-        } else {
-          this.pendingAiSchedules = items;
-          inputEl.value = "";
-          const toastMsg = deadlineCount > 0 ? `${items.length} kegiatan berhasil diparafrasekan (${deadlineCount} tugas deadline terdeteksi). Klik 'Simpan Semua' untuk memasukkan ke jadwal.` : `${items.length} kegiatan diekstrak & diparafrasekan. Klik 'Simpan Semua' untuk memasukkan ke jadwal.`;
-          notifications.showToast(toastMsg, "info", 4500);
-          this.renderAiPlanView();
-          const previewContainer = document.getElementById("ai-extracted-preview");
-          previewContainer?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }
-      } catch (err) {
-        notifications.showToast(err.message, "error", 5e3);
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-        renderIcons();
-      }
     },
     async handleSendChatMessage(e) {
       e.preventDefault();
@@ -4316,21 +4127,6 @@ ${JSON.stringify(fallbackItems)}
           );
         });
       }
-      const aiParseBtn = document.getElementById("btn-parse-ai-schedule");
-      const autoSaveCheckbox = document.getElementById("ai-auto-save-schedule");
-      if (aiParseBtn) {
-        aiParseBtn.addEventListener("click", () => this.handleAiScheduleExtraction());
-      }
-      if (autoSaveCheckbox && aiParseBtn) {
-        autoSaveCheckbox.addEventListener("change", () => {
-          const isAuto = autoSaveCheckbox.checked;
-          aiParseBtn.innerHTML = `
-          <span data-icon="calendar" data-icon-size="14"></span>
-          ${isAuto ? "Ekstrak & Simpan ke Jadwal" : "Ekstrak Jadwal (Pratinjau)"}
-        `;
-          renderIcons(aiParseBtn);
-        });
-      }
       document.querySelectorAll(".prompt-chip").forEach((chip) => {
         chip.addEventListener("click", () => {
           const prompt = chip.getAttribute("data-prompt");
@@ -4494,13 +4290,6 @@ ${JSON.stringify(fallbackItems)}
         btnShareSch.addEventListener("click", () => {
           springBounce(btnShareSch);
           this.openShareModal(this.selectedScheduleDate);
-        });
-      }
-      const btnOpenAiPlan = document.getElementById("btn-open-ai-plan-modal");
-      if (btnOpenAiPlan) {
-        btnOpenAiPlan.addEventListener("click", () => {
-          springBounce(btnOpenAiPlan);
-          this.openAiPlanModal();
         });
       }
       const btnManageCatSettings = document.getElementById("btn-settings-manage-categories");

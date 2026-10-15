@@ -6,7 +6,7 @@
   "main": "index.html",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && npm run build:bundle",
+    "build": "npm run build:bundle && vite build",
     "build:bundle": "npx esbuild js/app.js --bundle --outfile=js/bundle.js --format=iife && npx esbuild js/app.js --bundle --outfile=js/bundle.v5.js --format=iife",
     "preview": "vite preview",
     "start": "vite preview"

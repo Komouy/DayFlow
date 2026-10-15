@@ -232,22 +232,6 @@ class AppController {
       });
     }
 
-    // AI Schedule Extraction button & auto-save toggle
-    const aiParseBtn = document.getElementById('btn-parse-ai-schedule');
-    const autoSaveCheckbox = document.getElementById('ai-auto-save-schedule');
-    if (aiParseBtn) {
-      aiParseBtn.addEventListener('click', () => this.handleAiScheduleExtraction());
-    }
-    if (autoSaveCheckbox && aiParseBtn) {
-      autoSaveCheckbox.addEventListener('change', () => {
-        const isAuto = autoSaveCheckbox.checked;
-        aiParseBtn.innerHTML = `
-          <span data-icon="calendar" data-icon-size="14"></span>
-          ${isAuto ? 'Ekstrak & Simpan ke Jadwal' : 'Ekstrak Jadwal (Pratinjau)'}
-        `;
-        renderIcons(aiParseBtn);
-      });
-    }
 
     // Quick prompt chips
     document.querySelectorAll('.prompt-chip').forEach(chip => {
@@ -450,14 +434,7 @@ class AppController {
       });
     }
 
-    // AI Plan Modal Trigger Buttons (Susun Jadwal dari Kalimat Bebas)
-    const btnOpenAiPlan = document.getElementById('btn-open-ai-plan-modal');
-    if (btnOpenAiPlan) {
-      btnOpenAiPlan.addEventListener('click', () => {
-        springBounce(btnOpenAiPlan);
-        this.openAiPlanModal();
-      });
-    }
+
 
 
     // Category Settings Button

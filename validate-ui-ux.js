@@ -73,12 +73,12 @@ check(
 // ==========================================
 
 // 2.1 Single focal action per section
-const hasPrimaryCtas = files.html.includes('Tambah Jadwal') && files.html.includes('Ekstrak & Susun Jadwal');
+const hasPrimaryCtas = files.html.includes('Tambah Jadwal') && (files.html.includes('Tanya Asisten AI') || files.html.includes('Ekstrak & Susun Jadwal'));
 check(
   '2. UX Speed & 1-to-3 Rule',
   'Primary CTA clear per viewport section',
   hasPrimaryCtas,
-  'Tiap tab memiliki 1 aksi utama jelas (Tambah Jadwal, Ekstrak AI, Catatan Baru, Simpan Setelan).'
+  'Tiap tab memiliki 1 aksi utama jelas (Tambah Jadwal, Tanya Asisten AI, Catatan Baru, Simpan Setelan).'
 );
 
 // 2.2 Unified page-level date controls

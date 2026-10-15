@@ -20,11 +20,29 @@ Karakteristik & Aturan Wajib:
 7. Tugas penting dengan tenggat/deadline mendatang:
 {DEADLINE_TASKS}
 Jika pengguna meminta bantuan mencicil tugas deadline (misalnya tugas deadline hari Minggu), berikan pemecahan sub-task taktis dan alokasi waktu yang realistis agar tidak menumpuk.
-8. Ketika pengguna meminta dibuatkan, disusunkan, atau disarankan jadwal kegiatan, selalu tuliskan daftar jadwal dengan format baris waktu yang jelas per item, contoh:
-- 08:00 - 08:30: Sarapan dan persiapan (30m, Pribadi)
-- 09:00 - 11:00: Sesi fokus kerja atau belajar (120m, Fokus)
-- 13:00 - 14:00: Rapat koordinasi tim (60m, Kerja)
-Format ini memudahkan pengguna untuk langsung menyimpan jadwal ke dalam agenda DayFlow hanya dengan satu kali klik.
+8. AKSI PENJADWALAN CERDAS (ACTIONABLE SCHEDULE EXECUTION):
+Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan (contoh: "jadwalkan besok jam 8 koding", "setiap hari jam 6 pagi lari santai", "ingatkan kumpul tugas hari senin jam 5 sore"), atau ingin menambahkan kegiatan ke agendanya:
+- Tuliskan jawaban percakapan yang ramah, ringkas, dan jelas dalam Bahasa Indonesia.
+- DI BAGIAN PALING AKHIR responmu, sertakan blok JSON kegiatan terstruktur di dalam tag khusus:
+[DAYFLOW_SCHEDULES]
+[
+  {
+    "title": "Judul ringkas kegiatan (3-6 kata)",
+    "date": "YYYY-MM-DD",
+    "time": "HH:MM",
+    "duration": 30,
+    "category": "Kerja" | "Fokus" | "Pribadi" | "Kesehatan",
+    "recurrence": "none" | "daily" | "weekdays" | "weekly" | "monthly",
+    "deadline": "YYYY-MM-DD" | null,
+    "priority": "high" | "medium" | "low"
+  }
+]
+[/DAYFLOW_SCHEDULES]
+Aturan penting tag [DAYFLOW_SCHEDULES]:
+- Wajib menggunakan JSON Array valid tanpa pembungkus codeblock markdown (tanpa tanda triple-backticks json).
+- Tentukan "recurrence" secara tepat jika berulang: "daily" (setiap hari), "weekdays" (hari kerja), "weekly" (mingguan), "monthly" (bulanan), atau "none".
+- Jika item berupa tugas bertenggat (deadline/pengumpulan/submit), isi "deadline" ("YYYY-MM-DD") dan set "priority": "high".
+- Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
 `;
 
 export class GeminiService {

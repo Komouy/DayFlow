@@ -218,6 +218,20 @@ class AppController {
       chatForm.addEventListener('submit', (e) => this.handleSendChatMessage(e));
     }
 
+    // Chat auto-save toggle sync
+    const chatAutoSaveToggle = document.getElementById('chat-auto-save-toggle');
+    if (chatAutoSaveToggle) {
+      chatAutoSaveToggle.checked = !!state.getSettings().chatAutoSave;
+      chatAutoSaveToggle.addEventListener('change', () => {
+        state.updateSettings({ chatAutoSave: chatAutoSaveToggle.checked });
+        notifications.showToast(
+          chatAutoSaveToggle.checked ? 'Jadwal dari asisten akan otomatis disimpan.' : 'Jadwal dari asisten akan menunggu konfirmasi tombol simpan.',
+          'info',
+          3000
+        );
+      });
+    }
+
     // AI Schedule Extraction button & auto-save toggle
     const aiParseBtn = document.getElementById('btn-parse-ai-schedule');
     const autoSaveCheckbox = document.getElementById('ai-auto-save-schedule');
@@ -403,7 +417,11 @@ class AppController {
     if (btnTodaySusun) {
       btnTodaySusun.addEventListener('click', () => {
         springBounce(btnTodaySusun);
-        this.openAiPlanModal();
+        this.switchTab('ai-plan');
+        setTimeout(() => {
+          const chatInput = document.getElementById('chat-input');
+          if (chatInput) chatInput.focus();
+        }, 150);
       });
     }
 

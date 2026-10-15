@@ -256,7 +256,8 @@
     heroBannerUrl: "",
     heroBannerHeight: "normal",
     heroBannerOverlay: "medium",
-    heroBannerQuote: "Fokus pada hal penting hari ini."
+    heroBannerQuote: "Fokus pada hal penting hari ini.",
+    chatAutoSave: false
   };
   var StateManager = class {
     constructor() {
@@ -622,21 +623,28 @@
     getChatHistory() {
       return this.chatHistory;
     }
-    addChatMessage(roleOrMsg, maybeText = "", isProactive = false) {
+    addChatMessage(roleOrMsg, maybeText = "", isProactive = false, extraProps = {}) {
       let msg;
+      const baseId = "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
       if (typeof roleOrMsg === "object" && roleOrMsg !== null) {
         msg = {
+          id: roleOrMsg.id || baseId,
           role: roleOrMsg.role || "assistant",
           text: typeof roleOrMsg.text === "string" ? roleOrMsg.text : "",
           isProactive: !!roleOrMsg.isProactive,
-          timestamp: roleOrMsg.timestamp || Date.now()
+          savedSchedules: !!roleOrMsg.savedSchedules,
+          timestamp: roleOrMsg.timestamp || Date.now(),
+          ...extraProps
         };
       } else {
         msg = {
+          id: baseId,
           role: roleOrMsg || "assistant",
           text: typeof maybeText === "string" ? maybeText : "",
           isProactive: !!isProactive,
-          timestamp: Date.now()
+          savedSchedules: !!extraProps.savedSchedules,
+          timestamp: Date.now(),
+          ...extraProps
         };
       }
       this.chatHistory.push(msg);
@@ -644,6 +652,17 @@
       this._save(STORAGE_KEYS.CHAT_HISTORY, this.chatHistory);
       this.notify("chat:added", msg);
       return msg;
+    }
+    updateChatMessage(id, updates) {
+      if (!id || !updates || typeof updates !== "object") return null;
+      const msg = this.chatHistory.find((m) => m.id === id);
+      if (msg) {
+        Object.assign(msg, updates);
+        this._save(STORAGE_KEYS.CHAT_HISTORY, this.chatHistory);
+        this.notify("chat:updated", msg);
+        return msg;
+      }
+      return null;
     }
     clearChatHistory() {
       this.chatHistory = [
@@ -1510,11 +1529,29 @@ Karakteristik & Aturan Wajib:
 7. Tugas penting dengan tenggat/deadline mendatang:
 {DEADLINE_TASKS}
 Jika pengguna meminta bantuan mencicil tugas deadline (misalnya tugas deadline hari Minggu), berikan pemecahan sub-task taktis dan alokasi waktu yang realistis agar tidak menumpuk.
-8. Ketika pengguna meminta dibuatkan, disusunkan, atau disarankan jadwal kegiatan, selalu tuliskan daftar jadwal dengan format baris waktu yang jelas per item, contoh:
-- 08:00 - 08:30: Sarapan dan persiapan (30m, Pribadi)
-- 09:00 - 11:00: Sesi fokus kerja atau belajar (120m, Fokus)
-- 13:00 - 14:00: Rapat koordinasi tim (60m, Kerja)
-Format ini memudahkan pengguna untuk langsung menyimpan jadwal ke dalam agenda DayFlow hanya dengan satu kali klik.
+8. AKSI PENJADWALAN CERDAS (ACTIONABLE SCHEDULE EXECUTION):
+Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan (contoh: "jadwalkan besok jam 8 koding", "setiap hari jam 6 pagi lari santai", "ingatkan kumpul tugas hari senin jam 5 sore"), atau ingin menambahkan kegiatan ke agendanya:
+- Tuliskan jawaban percakapan yang ramah, ringkas, dan jelas dalam Bahasa Indonesia.
+- DI BAGIAN PALING AKHIR responmu, sertakan blok JSON kegiatan terstruktur di dalam tag khusus:
+[DAYFLOW_SCHEDULES]
+[
+  {
+    "title": "Judul ringkas kegiatan (3-6 kata)",
+    "date": "YYYY-MM-DD",
+    "time": "HH:MM",
+    "duration": 30,
+    "category": "Kerja" | "Fokus" | "Pribadi" | "Kesehatan",
+    "recurrence": "none" | "daily" | "weekdays" | "weekly" | "monthly",
+    "deadline": "YYYY-MM-DD" | null,
+    "priority": "high" | "medium" | "low"
+  }
+]
+[/DAYFLOW_SCHEDULES]
+Aturan penting tag [DAYFLOW_SCHEDULES]:
+- Wajib menggunakan JSON Array valid tanpa pembungkus codeblock markdown (tanpa tanda triple-backticks json).
+- Tentukan "recurrence" secara tepat jika berulang: "daily" (setiap hari), "weekdays" (hari kerja), "weekly" (mingguan), "monthly" (bulanan), atau "none".
+- Jika item berupa tugas bertenggat (deadline/pengumpulan/submit), isi "deadline" ("YYYY-MM-DD") dan set "priority": "high".
+- Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
 `;
   var GeminiService = class {
     static getApiKey() {
@@ -3329,43 +3366,206 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       }
       return items;
     },
-    // --- Save detected schedules from AI Chat bubble ---
-    handleSaveChatSchedules(text) {
-      const items = this.extractSchedulesFromText(text);
-      if (!items || items.length === 0) {
-        notifications.showToast("Tidak ada kegiatan terstruktur yang terdeteksi dari pesan ini.", "warning");
-        return;
+    // --- Extract schedule items from Gemini Assistant Message ---
+    extractSchedulesFromAssistantMessage(rawText) {
+      if (!rawText || typeof rawText !== "string") {
+        return { cleanText: "", schedules: [] };
       }
-      const added = state.addSchedules(items);
-      if (added && added.length > 0) {
-        const targetDate = added[0].date || getLocalDateString();
-        this.selectedScheduleDate = targetDate;
-        this.selectedCategory = "all";
-        const formattedDate = (/* @__PURE__ */ new Date(targetDate + "T00:00:00")).toLocaleDateString("id-ID", {
-          weekday: "short",
-          day: "numeric",
-          month: "short"
-        });
-        notifications.showToast(`${added.length} jadwal dari AI berhasil disimpan untuk ${formattedDate}!`, "success");
-        this.renderAiPlanView();
-        setTimeout(() => this.switchTab("schedule"), 400);
+      let cleanText = rawText;
+      let schedules = [];
+      const tagMatch = rawText.match(/\[DAYFLOW_SCHEDULES\]([\s\S]*?)\[\/DAYFLOW_SCHEDULES\]/i);
+      if (tagMatch) {
+        try {
+          let jsonStr = tagMatch[1].trim();
+          jsonStr = jsonStr.replace(/```json/gi, "").replace(/```/g, "").trim();
+          const parsed = JSON.parse(jsonStr);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const categories = state.getCategories();
+            const todayDate = getLocalDateString();
+            schedules = parsed.map((item) => {
+              const rawCat = (item.category || item.kategori || "Kerja").trim();
+              const foundCat = categories.find((c) => c.name.toLowerCase() === rawCat.toLowerCase());
+              const finalCat = foundCat ? foundCat.name : ["Kerja", "Fokus", "Pribadi", "Kesehatan"].includes(rawCat) ? rawCat : "Kerja";
+              const rawRec = String(item.recurrence || item.perulangan || "").toLowerCase().trim();
+              const validRec = ["none", "daily", "weekdays", "weekly", "monthly"];
+              const finalRec = validRec.includes(rawRec) ? rawRec : "none";
+              let cleanDeadline = null;
+              if (item.deadline && typeof item.deadline === "string" && item.deadline.trim() && item.deadline !== "null") {
+                cleanDeadline = normalizeDateString(item.deadline, todayDate);
+              }
+              return {
+                title: String(item.title || item.kegiatan || "Kegiatan Baru").trim(),
+                date: normalizeDateString(item.date, todayDate),
+                time: normalizeTimeString(item.time),
+                duration: Math.max(5, parseInt(item.duration, 10) || 30),
+                category: finalCat,
+                recurrence: finalRec,
+                deadline: cleanDeadline,
+                priority: ["high", "medium", "low"].includes(item.priority) ? item.priority : cleanDeadline ? "high" : "medium",
+                reminder: item.reminder !== false
+              };
+            });
+          }
+        } catch (err) {
+          console.warn("Failed parsing [DAYFLOW_SCHEDULES] tag:", err);
+        }
+        cleanText = rawText.replace(/\[DAYFLOW_SCHEDULES\][\s\S]*?\[\/DAYFLOW_SCHEDULES\]/gi, "").trim();
+      } else {
+        const fallbackItems = this.extractSchedulesFromText(rawText);
+        if (fallbackItems && fallbackItems.length > 0) {
+          const hasExplicitTime = fallbackItems.some((item) => item.time !== "09:00" || item.duration !== 30);
+          if (hasExplicitTime) {
+            schedules = fallbackItems;
+          }
+        }
       }
+      return { cleanText, schedules };
+    },
+    setupChatDelegation(containerEl) {
+      if (!containerEl || containerEl._hasChatDelegation) return;
+      containerEl._hasChatDelegation = true;
+      containerEl.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!target) return;
+        const saveBtn = target.closest('[data-action="save-chat-card"]');
+        if (saveBtn) {
+          e.stopPropagation();
+          const msgId = saveBtn.getAttribute("data-msg-id");
+          const rawJson = saveBtn.getAttribute("data-schedules");
+          if (!rawJson) return;
+          try {
+            const items = JSON.parse(decodeURIComponent(rawJson));
+            if (Array.isArray(items) && items.length > 0) {
+              const added = state.addSchedules(items);
+              state.updateChatMessage(msgId, { savedSchedules: true });
+              particleBurst(saveBtn, "var(--status-success)");
+              springBounce(saveBtn);
+              notifications.playChime();
+              notifications.showToast(`${added.length} agenda berhasil dimasukkan ke jadwal!`, "success");
+              this.renderAiPlanView();
+            }
+          } catch (err) {
+            console.error("Error saving chat schedules:", err);
+            notifications.showToast("Gagal menyimpan jadwal.", "warning");
+          }
+          return;
+        }
+        const viewBtn = target.closest('[data-action="view-chat-date"]');
+        if (viewBtn) {
+          e.stopPropagation();
+          const date = viewBtn.getAttribute("data-date") || getLocalDateString();
+          this.selectedScheduleDate = date;
+          this.selectedCategory = "all";
+          this.switchTab("schedule");
+          return;
+        }
+      });
     },
     // --- 3. AI Plan View ---
     renderAiPlanView() {
       const chatHistoryEl = document.getElementById("chat-history");
       if (chatHistoryEl) {
+        this.setupChatDelegation(chatHistoryEl);
         const history = state.getChatHistory();
-        chatHistoryEl.innerHTML = history.map((msg) => {
+        chatHistoryEl.innerHTML = history.map((msg, idx) => {
+          if (msg.role === "user") {
+            return `
+            <div class="chat-bubble chat-bubble-user">
+              <div class="chat-bubble-content">${formatMarkdown(msg.text)}</div>
+              <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
+                ${new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+              </div>
+            </div>
+          `;
+          }
+          const { cleanText, schedules } = this.extractSchedulesFromAssistantMessage(msg.text);
+          let scheduleCardHtml = "";
+          if (schedules.length > 0) {
+            const targetDate = schedules[0].date || getLocalDateString();
+            const displayDate = (/* @__PURE__ */ new Date(targetDate + "T00:00:00")).toLocaleDateString("id-ID", {
+              weekday: "short",
+              day: "numeric",
+              month: "short"
+            });
+            const itemsHtml = schedules.map((item) => {
+              let badgesHtml = "";
+              if (item.recurrence && item.recurrence !== "none") {
+                const recLabels = { daily: "Tiap Hari", weekdays: "Hari Kerja", weekly: "Mingguan", monthly: "Bulanan" };
+                const label = recLabels[item.recurrence] || "Berulang";
+                badgesHtml += `<span class="recurrence-badge" style="font-size:9px; padding:1px 5px;">${getIcon("repeat", "", 10)} ${label}</span>`;
+              }
+              if (item.deadline) {
+                badgesHtml += `<span class="deadline-badge is-urgent" style="font-size:9px; padding:1px 5px;">${getIcon("clock", "", 9)} Tenggat</span>`;
+              }
+              if (item.priority === "high") {
+                badgesHtml += `<span style="font-size:9px; padding:1px 5px; border-radius:3px; background:rgba(239,68,68,0.12); color:var(--status-danger); font-weight:600;">Tinggi</span>`;
+              }
+              const catInfo = state.getCategoryByName(item.category);
+              const catColor = catInfo.color || "#f97316";
+              return `
+              <div class="chat-schedule-item-row">
+                <span class="chat-schedule-item-time tabular-nums">${item.time}</span>
+                <span class="chat-schedule-item-title">${escapeHtml(item.title)}</span>
+                <span style="font-size:10px; color:var(--text-muted);">${item.duration}m</span>
+                <span class="schedule-category-badge" style="background-color:${catColor}18; color:${catColor}; font-size:9px; padding:1px 5px;">
+                  ${escapeHtml(item.category)}
+                </span>
+                ${badgesHtml}
+              </div>
+            `;
+            }).join("");
+            const encodedSchedules = encodeURIComponent(JSON.stringify(schedules));
+            let actionFooter = "";
+            if (msg.savedSchedules) {
+              actionFooter = `
+              <div class="chat-schedule-actions-row">
+                <span class="chat-saved-badge">
+                  ${getIcon("check", "", 12)} Tersimpan di Agenda
+                </span>
+                <button type="button" class="btn btn-ghost btn-xs" data-action="view-chat-date" data-date="${targetDate}" style="font-size:11px; padding:2px 8px; cursor:pointer;">
+                  Lihat di Agenda \u2192
+                </button>
+              </div>
+            `;
+            } else {
+              actionFooter = `
+              <div class="chat-schedule-actions-row">
+                <span style="font-size:11px; color:var(--text-muted);">
+                  ${schedules.length} kegiatan siap dimasukkan
+                </span>
+                <button type="button" class="btn btn-primary btn-xs" data-action="save-chat-card" data-msg-id="${msg.id || "msg_idx_" + idx}" data-schedules="${encodedSchedules}" style="font-size:11px; padding:4px 10px; cursor:pointer;">
+                  ${getIcon("check", "", 12)} Simpan ke Agenda
+                </button>
+              </div>
+            `;
+            }
+            scheduleCardHtml = `
+            <div class="chat-schedule-card">
+              <div class="chat-schedule-header">
+                <div class="chat-schedule-title-tag">
+                  <span data-icon="calendar" data-icon-size="13" class="text-orange"></span>
+                  Rencana Terjadwal (${schedules.length} Agenda)
+                </div>
+                <span class="chat-schedule-date-tag">${displayDate}</span>
+              </div>
+              <div class="chat-schedule-items">
+                ${itemsHtml}
+              </div>
+              ${actionFooter}
+            </div>
+          `;
+          }
           return `
-          <div class="chat-bubble chat-bubble-${msg.role}">
-            <div class="chat-bubble-content">${formatMarkdown(msg.text)}</div>
+          <div class="chat-bubble chat-bubble-assistant">
+            <div class="chat-bubble-content">${formatMarkdown(cleanText || msg.text)}</div>
+            ${scheduleCardHtml}
             <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
               ${new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
             </div>
           </div>
         `;
         }).join("");
+        renderIcons(chatHistoryEl);
         chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
       }
       const previewContainer = document.getElementById("ai-extracted-preview");
@@ -3557,12 +3757,41 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       this.renderAiPlanView();
       const submitBtn = document.getElementById("chat-submit-btn");
       if (submitBtn) submitBtn.disabled = true;
+      const autoSaveToggle = document.getElementById("chat-auto-save-toggle");
+      const shouldAutoSave = autoSaveToggle ? autoSaveToggle.checked : !!state.getSettings().chatAutoSave;
       try {
         const reply = await GeminiService.sendChatMessage(text);
-        state.addChatMessage("assistant", reply);
+        const { schedules } = this.extractSchedulesFromAssistantMessage(reply);
+        let isSaved = false;
+        if (shouldAutoSave && schedules && schedules.length > 0) {
+          state.addSchedules(schedules);
+          isSaved = true;
+          notifications.playChime();
+          notifications.showToast(`${schedules.length} agenda otomatis dimasukkan ke jadwal!`, "success");
+        }
+        state.addChatMessage("assistant", reply, false, { savedSchedules: isSaved });
       } catch (err) {
-        state.addChatMessage("assistant", `Terjadi kendala: ${err.message}`);
-        notifications.showToast(err.message, "error", 4500);
+        console.warn("AI chat error, attempting offline extraction fallback:", err);
+        const fallbackItems = this.extractSchedulesFromText(text);
+        if (fallbackItems && fallbackItems.length > 0) {
+          let isSaved = false;
+          if (shouldAutoSave) {
+            state.addSchedules(fallbackItems);
+            isSaved = true;
+            notifications.playChime();
+            notifications.showToast(`${fallbackItems.length} agenda otomatis dimasukkan (offline).`, "success");
+          }
+          const jsonBlock = `
+
+[DAYFLOW_SCHEDULES]
+${JSON.stringify(fallbackItems)}
+[/DAYFLOW_SCHEDULES]`;
+          const offlineReply = `(Mode Offline / Cepat) Aku telah menyusun ${fallbackItems.length} kegiatan dari rencana yang kamu sampaikan:${jsonBlock}`;
+          state.addChatMessage("assistant", offlineReply, false, { savedSchedules: isSaved });
+        } else {
+          state.addChatMessage("assistant", `Terjadi kendala saat menghubungi AI: ${err.message}`);
+          notifications.showToast(err.message, "error", 4500);
+        }
       } finally {
         if (submitBtn) submitBtn.disabled = false;
         this.renderAiPlanView();
@@ -4075,6 +4304,18 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       if (chatForm) {
         chatForm.addEventListener("submit", (e) => this.handleSendChatMessage(e));
       }
+      const chatAutoSaveToggle = document.getElementById("chat-auto-save-toggle");
+      if (chatAutoSaveToggle) {
+        chatAutoSaveToggle.checked = !!state.getSettings().chatAutoSave;
+        chatAutoSaveToggle.addEventListener("change", () => {
+          state.updateSettings({ chatAutoSave: chatAutoSaveToggle.checked });
+          notifications.showToast(
+            chatAutoSaveToggle.checked ? "Jadwal dari asisten akan otomatis disimpan." : "Jadwal dari asisten akan menunggu konfirmasi tombol simpan.",
+            "info",
+            3e3
+          );
+        });
+      }
       const aiParseBtn = document.getElementById("btn-parse-ai-schedule");
       const autoSaveCheckbox = document.getElementById("ai-auto-save-schedule");
       if (aiParseBtn) {
@@ -4227,7 +4468,11 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       if (btnTodaySusun) {
         btnTodaySusun.addEventListener("click", () => {
           springBounce(btnTodaySusun);
-          this.openAiPlanModal();
+          this.switchTab("ai-plan");
+          setTimeout(() => {
+            const chatInput = document.getElementById("chat-input");
+            if (chatInput) chatInput.focus();
+          }, 150);
         });
       }
       const btnTodayNotes = document.getElementById("btn-today-view-notes");

@@ -289,7 +289,8 @@ const DEFAULT_SETTINGS = {
   heroBannerUrl: '',
   heroBannerHeight: 'normal',
   heroBannerOverlay: 'medium',
-  heroBannerQuote: 'Fokus pada hal penting hari ini.'
+  heroBannerQuote: 'Fokus pada hal penting hari ini.',
+  chatAutoSave: false
 };
 
 class StateManager {
@@ -721,21 +722,29 @@ class StateManager {
     return this.chatHistory;
   }
 
-  addChatMessage(roleOrMsg, maybeText = '', isProactive = false) {
+  addChatMessage(roleOrMsg, maybeText = '', isProactive = false, extraProps = {}) {
     let msg;
+    const baseId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+
     if (typeof roleOrMsg === 'object' && roleOrMsg !== null) {
       msg = {
+        id: roleOrMsg.id || baseId,
         role: roleOrMsg.role || 'assistant',
         text: typeof roleOrMsg.text === 'string' ? roleOrMsg.text : '',
         isProactive: !!roleOrMsg.isProactive,
-        timestamp: roleOrMsg.timestamp || Date.now()
+        savedSchedules: !!roleOrMsg.savedSchedules,
+        timestamp: roleOrMsg.timestamp || Date.now(),
+        ...extraProps
       };
     } else {
       msg = {
+        id: baseId,
         role: roleOrMsg || 'assistant',
         text: typeof maybeText === 'string' ? maybeText : '',
         isProactive: !!isProactive,
-        timestamp: Date.now()
+        savedSchedules: !!extraProps.savedSchedules,
+        timestamp: Date.now(),
+        ...extraProps
       };
     }
     this.chatHistory.push(msg);
@@ -743,6 +752,18 @@ class StateManager {
     this._save(STORAGE_KEYS.CHAT_HISTORY, this.chatHistory);
     this.notify('chat:added', msg);
     return msg;
+  }
+
+  updateChatMessage(id, updates) {
+    if (!id || !updates || typeof updates !== 'object') return null;
+    const msg = this.chatHistory.find(m => m.id === id);
+    if (msg) {
+      Object.assign(msg, updates);
+      this._save(STORAGE_KEYS.CHAT_HISTORY, this.chatHistory);
+      this.notify('chat:updated', msg);
+      return msg;
+    }
+    return null;
   }
 
   clearChatHistory() {

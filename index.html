@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheet (Versioned & Inlined Design Tokens) -->
-  <link rel="stylesheet" href="/css/style.v5.css?v=6.4">
+  <link rel="stylesheet" href="/css/style.v5.css?v=6.5">
 
   <!-- Early Safe Proxy: Guarantees button clicks and tabs work immediately with zero latency -->
   <script>
@@ -30,7 +30,7 @@
     if ('caches' in window) {
       caches.keys().then(function(keys) {
         keys.forEach(function(k) {
-          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.4') {
+          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.5') {
             console.log('[DayFlow] Purging obsolete cache:', k);
             caches.delete(k);
           }
@@ -338,20 +338,20 @@
 
           <!-- Secondary Column: Quick Action & Note Cards -->
           <div style="display:flex; flex-direction:column; gap:var(--space-5);">
-            <!-- Quick AI Parser Card -->
+            <!-- Quick AI Assistant Card -->
             <div class="card card-elevated" style="display:flex; flex-direction:column; gap:12px; border-left:3px solid var(--accent-primary);">
               <div style="display:flex; align-items:center; justify-content:space-between;">
                 <span class="section-title" style="font-size:13px; display:inline-flex; align-items:center; gap:6px;">
-                  <span data-icon="calendar" data-icon-size="15" class="text-orange"></span>
-                  Susun Jadwal dari Kalimat Bebas
+                  <span data-icon="bot" data-icon-size="15" class="text-orange"></span>
+                  Tanya Asisten AI & Susun Jadwal
                 </span>
               </div>
               <p class="text-muted" style="font-size:12px; line-height:1.5;">
-                Punya rencana dadakan? Ketik kalimat santai untuk langsung diparafrasekan dan ditata menjadi agenda rapi.
+                Punya rencana atau ingin atur hari? Chat langsung dengan asisten untuk konsultasi, buat jadwal berulang, atau susun agendamu seketika.
               </p>
               <button class="btn btn-primary btn-sm" id="btn-today-susun-jadwal" style="width:100%;">
-                <span data-icon="calendar" data-icon-size="14"></span>
-                Susun Jadwal dari Teks
+                <span data-icon="bot" data-icon-size="14"></span>
+                Buka Asisten AI & Buat Jadwal
               </button>
             </div>
 
@@ -439,11 +439,11 @@
       <section id="view-ai-plan" class="view-tab hidden">
         <div class="page-control-bar">
           <div class="section-title-wrap">
-            <span class="section-title">Rencana AI & Asisten Gemini</span>
+            <span class="section-title">Asisten AI DayFlow (Chat & Jadwal Terpadu)</span>
           </div>
-          <button class="btn btn-primary btn-sm" id="btn-open-ai-plan-modal">
+          <button class="btn btn-secondary btn-sm" id="btn-open-ai-plan-modal" style="font-size:12px;">
             <span data-icon="calendar" data-icon-size="14"></span>
-            Susun Jadwal dari Kalimat Bebas
+            Input Teks Cepat
           </button>
         </div>
 
@@ -460,17 +460,20 @@
           </div>
 
           <div class="quick-prompts">
+            <button class="prompt-chip" data-prompt="Setiap hari jam 06:00 olahraga lari pagi">
+              + Jadwal Berulang Harian
+            </button>
+            <button class="prompt-chip" data-prompt="Susun jadwal fokus kerja dan istirahat hari ini mulai jam 08:30">
+              Susun Jadwal Hari Ini
+            </button>
+            <button class="prompt-chip" data-prompt="Besok jam 5 sore kumpul tugas fisika bab 2 paling lambat">
+              + Tugas Bertenggat (Deadline)
+            </button>
             <button class="prompt-chip" data-prompt="Bantu aku merapikan prioritas tugasku hari ini.">
               Prioritaskan Hari Ini
             </button>
-            <button class="prompt-chip" data-prompt="Bantu aku cicil tugas yang tenggatnya hari Minggu ini.">
-              Cicil Tugas Deadline
-            </button>
             <button class="prompt-chip" data-prompt="Bagaimana strategi time blocking yang baik agar tidak lelah?">
               Tips Time Blocking
-            </button>
-            <button class="prompt-chip" data-prompt="Ada waktu kosong berapa lama di jadwalku hari ini?">
-              Cek Waktu Luang
             </button>
           </div>
 
@@ -478,8 +481,15 @@
             <!-- Chat bubbles render here -->
           </div>
 
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding:0 2px;">
+            <label class="chat-auto-save-control">
+              <input type="checkbox" id="chat-auto-save-toggle">
+              <span>Otomatis simpan ke agenda saat asisten menyusun jadwal</span>
+            </label>
+          </div>
+
           <form id="chat-form" class="chat-input-bar">
-            <input type="text" id="chat-input" class="chat-input" placeholder="Tanyakan saran atau jadwal ke Gemini..." autocomplete="off">
+            <input type="text" id="chat-input" class="chat-input" placeholder="Ketik rencana kegiatan, jadwal berulang, atau tanya saran..." autocomplete="off">
             <button type="submit" id="chat-submit-btn" class="btn btn-primary btn-sm btn-icon" aria-label="Kirim Pesan">
               <span data-icon="send" data-icon-size="16"></span>
             </button>

@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheet (Versioned & Inlined Design Tokens) -->
-  <link rel="stylesheet" href="/css/style.v5.css?v=5.4">
+  <link rel="stylesheet" href="/css/style.v5.css?v=6.3">
 
   <!-- Early Safe Proxy: Guarantees button clicks and tabs work immediately with zero latency -->
   <script>
@@ -30,7 +30,7 @@
     if ('caches' in window) {
       caches.keys().then(function(keys) {
         keys.forEach(function(k) {
-          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.2') {
+          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.3') {
             console.log('[DayFlow] Purging obsolete cache:', k);
             caches.delete(k);
           }

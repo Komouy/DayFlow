@@ -342,6 +342,7 @@ export const scheduleViewMethods = {
               <div class="timeline-card-header">
                 <div style="display:flex; flex-direction:column; gap:4px; min-width:0; flex:1;">
                   <div class="timeline-card-title">${escapeHtml(s.title)}</div>
+                  ${s.description ? `<div class="timeline-card-desc" style="font-size:12px; color:var(--text-secondary); line-height:1.4;">${escapeHtml(s.description)}</div>` : ''}
                   <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                     ${priorityBadgeHtml}
                     ${recurrenceBadgeHtml}

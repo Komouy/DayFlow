@@ -490,6 +490,7 @@
         time: safeTime,
         duration: Math.max(5, parseInt(scheduleData.duration || scheduleData.durasi, 10) || 30),
         title: safeTitle,
+        description: (typeof scheduleData.description === "string" ? scheduleData.description : scheduleData.deskripsi || scheduleData.notes || scheduleData.catatan || "").trim(),
         category: scheduleData.category && typeof scheduleData.category === "string" ? scheduleData.category.trim() : scheduleData.kategori || "Fokus",
         priority: ["low", "medium", "high"].includes(scheduleData.priority) ? scheduleData.priority : "medium",
         deadline: scheduleData.deadline ? normalizeDateString(scheduleData.deadline) : null,
@@ -520,6 +521,7 @@
           time: safeTime,
           duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
           title: safeTitle,
+          description: (typeof item.description === "string" ? item.description : item.deskripsi || item.notes || item.catatan || "").trim(),
           category: item.category && typeof item.category === "string" ? item.category.trim() : item.kategori || "Fokus",
           priority: ["low", "medium", "high"].includes(item.priority) ? item.priority : "medium",
           deadline: item.deadline ? normalizeDateString(item.deadline) : null,
@@ -554,6 +556,7 @@
         if (cleanUpdates.time) cleanUpdates.time = normalizeTimeString(cleanUpdates.time);
         if (cleanUpdates.deadline) cleanUpdates.deadline = normalizeDateString(cleanUpdates.deadline);
         if (cleanUpdates.title) cleanUpdates.title = String(cleanUpdates.title).trim();
+        if (typeof cleanUpdates.description === "string") cleanUpdates.description = cleanUpdates.description.trim();
         this.schedules[idx] = { ...this.schedules[idx], ...cleanUpdates };
         this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
         this.notify("schedule:updated", this.schedules[idx]);
@@ -1367,7 +1370,8 @@
       totalMinutes += dur;
       const cat = s.category ? ` [${s.category}]` : "";
       const status = s.completed ? " (Selesai)" : "";
-      lines.push(`- ${s.time} (${dur}m): ${s.title}${cat}${status}`);
+      const desc = s.description ? ` - ${s.description}` : "";
+      lines.push(`- ${s.time} (${dur}m): ${s.title}${desc}${cat}${status}`);
     });
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
@@ -1390,7 +1394,10 @@
     const dtStart = `${dateStr}T${startH}${startM}00`;
     const dtEnd = `${dateStr}T${endH}${endM}00`;
     const title = encodeURIComponent(schedule.title || "Agenda DayFlow");
-    const details = encodeURIComponent(`Kategori: ${schedule.category || "Kerja"} | Disusun dengan DayFlow AI`);
+    const descText = schedule.description ? `${schedule.description}
+
+` : "";
+    const details = encodeURIComponent(`${descText}Kategori: ${schedule.category || "Kerja"} | Disusun dengan DayFlow AI`);
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&details=${details}`;
   }
   function generateIcsFileContent(schedules, dateStr) {
@@ -1409,6 +1416,7 @@
       const dtStart = `${rawDate}T${startH}${startM}00`;
       const dtEnd = `${rawDate}T${endH}${endM}00`;
       const cleanTitle = (s.title || "Agenda DayFlow").replace(/[,;\n]/g, " ");
+      const descText = s.description ? `${s.description.replace(/[,;\n]/g, " ")} - ` : "";
       return [
         "BEGIN:VEVENT",
         `UID:${s.id || Date.now() + Math.random()}@dayflow.web.app`,
@@ -1416,7 +1424,7 @@
         `DTSTART:${dtStart}`,
         `DTEND:${dtEnd}`,
         `SUMMARY:${cleanTitle}`,
-        `DESCRIPTION:Kategori: ${s.category || "Kerja"} | Disusun dengan DayFlow AI`,
+        `DESCRIPTION:${descText}Kategori: ${s.category || "Kerja"} | Disusun dengan DayFlow AI`,
         "STATUS:CONFIRMED",
         "END:VEVENT"
       ].join("\r\n");
@@ -1548,6 +1556,7 @@ Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan
 [
   {
     "title": "Judul ringkas kegiatan (3-6 kata)",
+    "description": "Deskripsi singkat / lokasi / ruangan / catatan kegiatan (maksimal 1-2 kalimat)",
     "date": "YYYY-MM-DD",
     "time": "HH:MM",
     "duration": 30,
@@ -1560,6 +1569,7 @@ Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan
 [/DAYFLOW_SCHEDULES]
 Aturan penting tag [DAYFLOW_SCHEDULES]:
 - Wajib menggunakan JSON Array valid tanpa pembungkus codeblock markdown (tanpa tanda triple-backticks json).
+- "description": Tuliskan keterangan singkat, lokasi, ruangan, atau catatan penting (contoh: "Fakultas Saintek 3S.1 (s/d selesai)", "Membawa modul & laptop", "Zoom meeting"). Jika tidak ada catatan khusus, isi string kosong "".
 - Tentukan "recurrence" secara tepat jika berulang: "daily" (setiap hari), "weekdays" (hari kerja), "weekly" (mingguan), "monthly" (bulanan), atau "none".
 - Jika item berupa tugas bertenggat (deadline/pengumpulan/submit), isi "deadline" ("YYYY-MM-DD") dan set "priority": "high".
 - Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
@@ -1960,6 +1970,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const modal = document.getElementById("modal-schedule");
       const titleEl = document.getElementById("modal-schedule-title");
       const inputTitle = document.getElementById("sch-input-title");
+      const inputDescription = document.getElementById("sch-input-description");
       const inputDate = document.getElementById("sch-input-date");
       const inputTime = document.getElementById("sch-input-time");
       const inputDuration = document.getElementById("sch-input-duration");
@@ -1976,6 +1987,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         if (item) {
           titleEl.textContent = "Ubah Jadwal";
           inputTitle.value = item.title;
+          if (inputDescription) inputDescription.value = item.description || "";
           inputDate.value = item.date;
           inputTime.value = item.time;
           currentDuration = item.duration || 30;
@@ -1988,6 +2000,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       } else {
         titleEl.textContent = "Tambah Jadwal Baru";
         inputTitle.value = "";
+        if (inputDescription) inputDescription.value = "";
         inputDate.value = this.selectedScheduleDate || getLocalDateString();
         inputTime.value = "09:00";
         currentDuration = 30;
@@ -2018,6 +2031,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
     handleSaveSchedule(e) {
       e.preventDefault();
       const inputTitle = document.getElementById("sch-input-title");
+      const inputDescription = document.getElementById("sch-input-description");
       const inputDate = document.getElementById("sch-input-date");
       const inputTime = document.getElementById("sch-input-time");
       const inputDuration = document.getElementById("sch-input-duration");
@@ -2034,6 +2048,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       }
       const payload = {
         title,
+        description: inputDescription ? inputDescription.value.trim() : "",
         date: inputDate.value || getLocalDateString(),
         time: inputTime.value || "09:00",
         duration: parseInt(inputDuration.value, 10) || 30,
@@ -3174,6 +3189,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
               <div class="timeline-card-header">
                 <div style="display:flex; flex-direction:column; gap:4px; min-width:0; flex:1;">
                   <div class="timeline-card-title">${escapeHtml(s.title)}</div>
+                  ${s.description ? `<div class="timeline-card-desc" style="font-size:12px; color:var(--text-secondary); line-height:1.4;">${escapeHtml(s.description)}</div>` : ""}
                   <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                     ${priorityBadgeHtml}
                     ${recurrenceBadgeHtml}
@@ -3411,8 +3427,16 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         } else {
           title = isDeadline ? "Kumpul Tugas Bertenggat" : "Kegiatan Terjadwal";
         }
+        let description = "";
+        const locMatch = chunk.match(/(?:📍|\blengkap\s+di\b|\blokasi\s*[:\-]?\s*|\btempat\s*[:\-]?\s*|\bruang(?:an)?\s*[:\-]?\s*)([^,;\n]+)/i);
+        if (locMatch) {
+          description = locMatch[1].trim();
+        } else if (/selesai|tuntas|done/i.test(chunk)) {
+          description = "Berlangsung s/d selesai";
+        }
         items.push({
           title,
+          description,
           date: itemDate,
           time: startTime,
           duration: Math.max(5, duration),
@@ -3454,6 +3478,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
               }
               return {
                 title: String(item.title || item.kegiatan || "Kegiatan Baru").trim(),
+                description: String(item.description || item.deskripsi || item.notes || item.catatan || "").trim(),
                 date: normalizeDateString(item.date, todayDate),
                 time: normalizeTimeString(item.time),
                 duration: Math.max(5, parseInt(item.duration, 10) || 30),
@@ -3562,9 +3587,12 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
               const catInfo = state.getCategoryByName(item.category);
               const catColor = catInfo.color || "#f97316";
               return `
-              <div class="chat-schedule-item-row">
+              <div class="chat-schedule-item-row" style="flex-wrap:wrap; align-items:flex-start;">
                 <span class="chat-schedule-item-time tabular-nums">${item.time}</span>
-                <span class="chat-schedule-item-title">${escapeHtml(item.title)}</span>
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
+                  <span class="chat-schedule-item-title">${escapeHtml(item.title)}</span>
+                  ${item.description ? `<span style="font-size:11px; color:var(--text-muted); line-height:1.3;">${escapeHtml(item.description)}</span>` : ""}
+                </div>
                 <span style="font-size:10px; color:var(--text-muted);">${item.duration}m</span>
                 <span class="schedule-category-badge" style="background-color:${catColor}18; color:${catColor}; font-size:9px; padding:1px 5px;">
                   ${escapeHtml(item.category)}

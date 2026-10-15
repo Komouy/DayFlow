@@ -17,6 +17,7 @@ export const modalMethods = {
     const modal = document.getElementById('modal-schedule');
     const titleEl = document.getElementById('modal-schedule-title');
     const inputTitle = document.getElementById('sch-input-title');
+    const inputDescription = document.getElementById('sch-input-description');
     const inputDate = document.getElementById('sch-input-date');
     const inputTime = document.getElementById('sch-input-time');
     const inputDuration = document.getElementById('sch-input-duration');
@@ -35,6 +36,7 @@ export const modalMethods = {
       if (item) {
         titleEl.textContent = 'Ubah Jadwal';
         inputTitle.value = item.title;
+        if (inputDescription) inputDescription.value = item.description || '';
         inputDate.value = item.date;
         inputTime.value = item.time;
         currentDuration = item.duration || 30;
@@ -47,6 +49,7 @@ export const modalMethods = {
     } else {
       titleEl.textContent = 'Tambah Jadwal Baru';
       inputTitle.value = '';
+      if (inputDescription) inputDescription.value = '';
       inputDate.value = this.selectedScheduleDate || getLocalDateString();
       inputTime.value = '09:00';
       currentDuration = 30;
@@ -88,6 +91,7 @@ export const modalMethods = {
   handleSaveSchedule(e) {
     e.preventDefault();
     const inputTitle = document.getElementById('sch-input-title');
+    const inputDescription = document.getElementById('sch-input-description');
     const inputDate = document.getElementById('sch-input-date');
     const inputTime = document.getElementById('sch-input-time');
     const inputDuration = document.getElementById('sch-input-duration');
@@ -106,6 +110,7 @@ export const modalMethods = {
 
     const payload = {
       title,
+      description: inputDescription ? inputDescription.value.trim() : '',
       date: inputDate.value || getLocalDateString(),
       time: inputTime.value || '09:00',
       duration: parseInt(inputDuration.value, 10) || 30,

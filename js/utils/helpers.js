@@ -142,7 +142,8 @@ export function generateScheduleText(schedules, dateStr) {
     totalMinutes += dur;
     const cat = s.category ? ` [${s.category}]` : '';
     const status = s.completed ? ' (Selesai)' : '';
-    lines.push(`- ${s.time} (${dur}m): ${s.title}${cat}${status}`);
+    const desc = s.description ? ` - ${s.description}` : '';
+    lines.push(`- ${s.time} (${dur}m): ${s.title}${desc}${cat}${status}`);
   });
 
   const hours = Math.floor(totalMinutes / 60);
@@ -172,7 +173,8 @@ export function generateGoogleCalendarUrl(schedule) {
   const dtEnd = `${dateStr}T${endH}${endM}00`;
 
   const title = encodeURIComponent(schedule.title || 'Agenda DayFlow');
-  const details = encodeURIComponent(`Kategori: ${schedule.category || 'Kerja'} | Disusun dengan DayFlow AI`);
+  const descText = schedule.description ? `${schedule.description}\n\n` : '';
+  const details = encodeURIComponent(`${descText}Kategori: ${schedule.category || 'Kerja'} | Disusun dengan DayFlow AI`);
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dtStart}/${dtEnd}&details=${details}`;
 }
@@ -196,6 +198,7 @@ export function generateIcsFileContent(schedules, dateStr) {
     const dtStart = `${rawDate}T${startH}${startM}00`;
     const dtEnd = `${rawDate}T${endH}${endM}00`;
     const cleanTitle = (s.title || 'Agenda DayFlow').replace(/[,;\n]/g, ' ');
+    const descText = s.description ? `${s.description.replace(/[,;\n]/g, ' ')} - ` : '';
 
     return [
       'BEGIN:VEVENT',
@@ -204,7 +207,7 @@ export function generateIcsFileContent(schedules, dateStr) {
       `DTSTART:${dtStart}`,
       `DTEND:${dtEnd}`,
       `SUMMARY:${cleanTitle}`,
-      `DESCRIPTION:Kategori: ${s.category || 'Kerja'} | Disusun dengan DayFlow AI`,
+      `DESCRIPTION:${descText}Kategori: ${s.category || 'Kerja'} | Disusun dengan DayFlow AI`,
       'STATUS:CONFIRMED',
       'END:VEVENT'
     ].join('\r\n');

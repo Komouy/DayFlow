@@ -226,8 +226,18 @@ export const aiPlanViewMethods = {
         title = isDeadline ? 'Kumpul Tugas Bertenggat' : 'Kegiatan Terjadwal';
       }
 
+      // Extract location or note for description
+      let description = '';
+      const locMatch = chunk.match(/(?:📍|\blengkap\s+di\b|\blokasi\s*[:\-]?\s*|\btempat\s*[:\-]?\s*|\bruang(?:an)?\s*[:\-]?\s*)([^,;\n]+)/i);
+      if (locMatch) {
+        description = locMatch[1].trim();
+      } else if (/selesai|tuntas|done/i.test(chunk)) {
+        description = 'Berlangsung s/d selesai';
+      }
+
       items.push({
         title: title,
+        description: description,
         date: itemDate,
         time: startTime,
         duration: Math.max(5, duration),
@@ -277,6 +287,7 @@ export const aiPlanViewMethods = {
 
             return {
               title: String(item.title || item.kegiatan || 'Kegiatan Baru').trim(),
+              description: String(item.description || item.deskripsi || item.notes || item.catatan || '').trim(),
               date: normalizeDateString(item.date, todayDate),
               time: normalizeTimeString(item.time),
               duration: Math.max(5, parseInt(item.duration, 10) || 30),
@@ -408,9 +419,12 @@ export const aiPlanViewMethods = {
             const catColor = catInfo.color || '#f97316';
 
             return `
-              <div class="chat-schedule-item-row">
+              <div class="chat-schedule-item-row" style="flex-wrap:wrap; align-items:flex-start;">
                 <span class="chat-schedule-item-time tabular-nums">${item.time}</span>
-                <span class="chat-schedule-item-title">${escapeHtml(item.title)}</span>
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
+                  <span class="chat-schedule-item-title">${escapeHtml(item.title)}</span>
+                  ${item.description ? `<span style="font-size:11px; color:var(--text-muted); line-height:1.3;">${escapeHtml(item.description)}</span>` : ''}
+                </div>
                 <span style="font-size:10px; color:var(--text-muted);">${item.duration}m</span>
                 <span class="schedule-category-badge" style="background-color:${catColor}18; color:${catColor}; font-size:9px; padding:1px 5px;">
                   ${escapeHtml(item.category)}

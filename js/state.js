@@ -568,6 +568,7 @@ class StateManager {
       time: safeTime,
       duration: Math.max(5, parseInt(scheduleData.duration || scheduleData.durasi, 10) || 30),
       title: safeTitle,
+      description: (typeof scheduleData.description === 'string' ? scheduleData.description : (scheduleData.deskripsi || scheduleData.notes || scheduleData.catatan || '')).trim(),
       category: (scheduleData.category && typeof scheduleData.category === 'string') ? scheduleData.category.trim() : (scheduleData.kategori || 'Fokus'),
       priority: ['low', 'medium', 'high'].includes(scheduleData.priority) ? scheduleData.priority : 'medium',
       deadline: scheduleData.deadline ? normalizeDateString(scheduleData.deadline) : null,
@@ -602,6 +603,7 @@ class StateManager {
         time: safeTime,
         duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
         title: safeTitle,
+        description: (typeof item.description === 'string' ? item.description : (item.deskripsi || item.notes || item.catatan || '')).trim(),
         category: (item.category && typeof item.category === 'string') ? item.category.trim() : (item.kategori || 'Fokus'),
         priority: ['low', 'medium', 'high'].includes(item.priority) ? item.priority : 'medium',
         deadline: item.deadline ? normalizeDateString(item.deadline) : null,
@@ -644,6 +646,7 @@ class StateManager {
       if (cleanUpdates.time) cleanUpdates.time = normalizeTimeString(cleanUpdates.time);
       if (cleanUpdates.deadline) cleanUpdates.deadline = normalizeDateString(cleanUpdates.deadline);
       if (cleanUpdates.title) cleanUpdates.title = String(cleanUpdates.title).trim();
+      if (typeof cleanUpdates.description === 'string') cleanUpdates.description = cleanUpdates.description.trim();
       this.schedules[idx] = { ...this.schedules[idx], ...cleanUpdates };
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
       this.notify('schedule:updated', this.schedules[idx]);

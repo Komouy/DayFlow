@@ -39,6 +39,7 @@ Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan
 [
   {
     "title": "Judul ringkas kegiatan (3-6 kata)",
+    "description": "Deskripsi singkat / lokasi / ruangan / catatan kegiatan (maksimal 1-2 kalimat)",
     "date": "YYYY-MM-DD",
     "time": "HH:MM",
     "duration": 30,
@@ -51,6 +52,7 @@ Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan
 [/DAYFLOW_SCHEDULES]
 Aturan penting tag [DAYFLOW_SCHEDULES]:
 - Wajib menggunakan JSON Array valid tanpa pembungkus codeblock markdown (tanpa tanda triple-backticks json).
+- "description": Tuliskan keterangan singkat, lokasi, ruangan, atau catatan penting (contoh: "Fakultas Saintek 3S.1 (s/d selesai)", "Membawa modul & laptop", "Zoom meeting"). Jika tidak ada catatan khusus, isi string kosong "".
 - Tentukan "recurrence" secara tepat jika berulang: "daily" (setiap hari), "weekdays" (hari kerja), "weekly" (mingguan), "monthly" (bulanan), atau "none".
 - Jika item berupa tugas bertenggat (deadline/pengumpulan/submit), isi "deadline" ("YYYY-MM-DD") dan set "priority": "high".
 - Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].

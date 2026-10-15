@@ -131,6 +131,18 @@ export const aiPlanViewMethods = {
         priority = 'high';
       }
 
+      // Detect Recurrence
+      let recurrence = 'none';
+      if (/\b(?:setiap\s+hari|tiap\s+hari|rutin\s+harian|sehari-hari|tiap\s+pagi|setiap\s+pagi|tiap\s+sore|setiap\s+sore|tiap\s+malam|setiap\s+malam)\b/i.test(chunk)) {
+        recurrence = 'daily';
+      } else if (/\b(?:hari\s+kerja|senin\s*(?:sampai|sd|s\/d|-)\s*jumat|senin\s*-\s*jum'at)\b/i.test(chunk)) {
+        recurrence = 'weekdays';
+      } else if (/\b(?:setiap\s+minggu|tiap\s+minggu|seminggu\s+sekali|setiap\s+(?:senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)|tiap\s+(?:senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu))\b/i.test(chunk)) {
+        recurrence = 'weekly';
+      } else if (/\b(?:setiap\s+bulan|tiap\s+bulan|sebulan\s+sekali|tiap\s+tanggal|setiap\s+tanggal)\b/i.test(chunk)) {
+        recurrence = 'monthly';
+      }
+
       // Infer category
       let category = isDeadline ? 'Kerja' : 'Fokus';
       if (/kesehatan|olahraga|jogging|lari|gym|sehat|tidur|istirahat|meditasi/i.test(chunk)) category = 'Kesehatan';
@@ -147,6 +159,9 @@ export const aiPlanViewMethods = {
       title = title.replace(/\b\d+\s*(?:menit|mins?|jam|hours?)\b/gi, '');
       // Strip conversational noise and trigger prefixes
       title = title.replace(/\b(?:tolong(?:\s+dong)?|ingetin(?:\s+aku)?|ingatkan(?:\s+aku)?|jangan\s+lupa(?:\s+ya)?|pliss?|please|aku\s+mau|mau|rencananya|nanti(?:\s+malam|\s+siang|\s+sore)?|harus\s+banget|harus|wajib|kudu|kayaknya|paling\s+lambat|paling\s+lama|deadline(?:\s+nya)?|tenggat(?:\s+waktu)?)\b/gi, '');
+      // Strip recurrence keywords from title
+      title = title.replace(/\b(?:setiap|tiap)\s+(?:hari|pagi|siang|sore|malam|minggu|bulan|senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\b/gi, '');
+      title = title.replace(/\b(?:rutin\s+harian|sehari-hari|seminggu\s+sekali|sebulan\s+sekali|hari\s+kerja)\b/gi, '');
       // Strip relative dates and day names from title
       title = title.replace(/\b(?:besok(?:\s+pagi|\s+siang|\s+sore|\s+malam)?|lusa|hari\s+ini|semalam)\b/gi, '');
       title = title.replace(/\b(?:hari\s+)?(?:senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\b/gi, '');
@@ -174,7 +189,8 @@ export const aiPlanViewMethods = {
         category: category,
         deadline: deadlineDate,
         priority: priority,
-        reminder: true
+        reminder: true,
+        recurrence: recurrence
       });
     }
 
@@ -278,6 +294,22 @@ export const aiPlanViewMethods = {
                   `;
                 }
 
+                let recurrenceBadge = '';
+                if (item.recurrence && item.recurrence !== 'none') {
+                  const recLabels = {
+                    daily: 'Tiap Hari',
+                    weekdays: 'Hari Kerja',
+                    weekly: 'Mingguan',
+                    monthly: 'Bulanan'
+                  };
+                  const label = recLabels[item.recurrence] || 'Berulang';
+                  recurrenceBadge = `
+                    <span class="recurrence-badge" style="font-size:10px; padding:2px 6px;">
+                      ${getIcon('repeat', '', 10)} ${label}
+                    </span>
+                  `;
+                }
+
                 return `
                   <div class="schedule-card" style="padding: 10px 12px; display:flex; align-items:center; gap:10px;">
                     <div class="tabular-nums text-orange" style="font-size: 13px; font-weight:600; min-width:44px;">${item.time}</div>
@@ -287,6 +319,7 @@ export const aiPlanViewMethods = {
                         <span>${item.duration}m</span>
                         <span>•</span>
                         <span class="schedule-category-badge">${escapeHtml(item.category)}</span>
+                        ${recurrenceBadge}
                         ${deadlineBadge}
                         ${priorityBadge}
                       </div>

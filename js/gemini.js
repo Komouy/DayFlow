@@ -87,7 +87,7 @@ export class GeminiService {
     }
 
     const primaryModel = this.getModel();
-    const candidateModels = [primaryModel, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'].filter((v, i, a) => a.indexOf(v) === i);
+    const candidateModels = [primaryModel, 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-2.5-flash'].filter((v, i, a) => a.indexOf(v) === i);
 
     let lastError = null;
 
@@ -428,7 +428,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
 
     // If explicit key provided or proxy not available
     if (keyToTest && (customKey !== null || !proxyUrl)) {
-      const candidateModels = [this.getModel(), 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      const candidateModels = [this.getModel(), 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-2.5-flash'];
       for (const model of candidateModels) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(keyToTest)}`;
         try {

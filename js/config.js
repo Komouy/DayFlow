@@ -18,7 +18,7 @@ export const APP_CONFIG = {
   CENTRAL_API_KEY: '',
 
   // Default Gemini Intelligence Model
-  DEFAULT_MODEL: 'gemini-2.0-flash',
+  DEFAULT_MODEL: 'gemini-3.8-flash',
 
   // Version identifier
   VERSION: '6.1.0'

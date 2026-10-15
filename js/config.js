@@ -12,8 +12,7 @@
 
 export const APP_CONFIG = {
   // Free & Secure Serverless AI Proxy endpoint (Cloudflare Worker)
-  // Set your Cloudflare Worker URL here once deployed, e.g. 'https://dayflow-ai-proxy.workers.dev'
-  AI_PROXY_URL: '',
+  AI_PROXY_URL: 'https://dayflow.dhavinal20.workers.dev',
 
   // Optional: Centralized Shared API Key (Used as fallback if proxy URL is not set yet)
   CENTRAL_API_KEY: '',

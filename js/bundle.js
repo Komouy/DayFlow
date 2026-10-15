@@ -3264,6 +3264,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const deadlineKeywords = /\b(?:deadline|tenggat|paling\s+lambat|harus\s+kumpul|kumpul(?:kan)?(?:\s+tugas)?|submit|due\s+date|maksimal|harus\s+kelar|harus\s+selesai|pengumpulan)\b/i;
       for (let chunk of rawChunks) {
         if (!chunk || chunk.length < 3) continue;
+        let itemDate = targetDate || today;
         const lower = chunk.toLowerCase();
         const indMonths = {
           januari: "01",
@@ -3393,6 +3394,9 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         if (isDeadline) {
           deadlineDate = itemDate;
           priority = "high";
+        }
+        if (!matchedTime && !isDeadline) {
+          continue;
         }
         let recurrence = "none";
         if (/\b(?:setiap\s+hari|tiap\s+hari|rutin\s+harian|sehari-hari|tiap\s+pagi|setiap\s+pagi|tiap\s+sore|setiap\s+sore|tiap\s+malam|setiap\s+malam)\b/i.test(chunk)) {

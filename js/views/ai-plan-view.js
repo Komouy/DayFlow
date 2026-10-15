@@ -36,6 +36,7 @@ export const aiPlanViewMethods = {
     for (let chunk of rawChunks) {
       if (!chunk || chunk.length < 3) continue;
 
+      let itemDate = targetDate || today;
       const lower = chunk.toLowerCase();
       const indMonths = {
         januari: '01', jan: '01', februari: '02', feb: '02', maret: '03', mar: '03', april: '04', apr: '04',
@@ -166,6 +167,11 @@ export const aiPlanViewMethods = {
       if (isDeadline) {
         deadlineDate = itemDate;
         priority = 'high';
+      }
+
+      // If chunk does not contain any valid time pattern and is not a deadline task, skip
+      if (!matchedTime && !isDeadline) {
+        continue;
       }
 
       // Detect Recurrence

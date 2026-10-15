@@ -15,11 +15,10 @@ const CORS_HEADERS = {
 };
 
 const FALLBACK_MODELS = [
-  'gemini-3.8-flash',
+  'gemini-2.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
-  'gemini-2.5-flash',
-  'gemini-4-argon'
+  'gemini-3.8-flash'
 ];
 
 export default async function handler(request) {
@@ -58,7 +57,7 @@ export default async function handler(request) {
 
   try {
     const reqBody = await request.json();
-    let model = reqBody.model || 'gemini-3.8-flash';
+    let model = reqBody.model || 'gemini-2.5-flash';
     let payload = reqBody.payload || reqBody;
 
     const candidateModels = [model, ...FALLBACK_MODELS].filter((v, i, a) => a.indexOf(v) === i);

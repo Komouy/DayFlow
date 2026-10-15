@@ -308,32 +308,6 @@ class AppController {
       });
     });
 
-    // Custom Gemini Model Picker trigger & bottom sheet modal
-    const openModelPickerBtn = document.getElementById('btn-open-model-picker');
-    const modalPickerModel = document.getElementById('modal-picker-model');
-    if (openModelPickerBtn && modalPickerModel) {
-      openModelPickerBtn.addEventListener('click', () => {
-        modalPickerModel.classList.add('open');
-      });
-    }
-
-    const closeModelPickerBtn = document.getElementById('btn-close-model-picker');
-    if (closeModelPickerBtn && modalPickerModel) {
-      closeModelPickerBtn.addEventListener('click', () => {
-        modalPickerModel.classList.remove('open');
-      });
-    }
-
-    document.querySelectorAll('.model-picker-option').forEach(option => {
-      option.addEventListener('click', () => {
-        const modelId = option.getAttribute('data-model-id');
-        this.updateModelPickerUI(modelId);
-        springBounce(option);
-        if (modalPickerModel) {
-          setTimeout(() => modalPickerModel.classList.remove('open'), 160);
-        }
-      });
-    });
 
     // API Key Guide Modal trigger
     const openApiGuideBtn = document.getElementById('btn-open-api-guide');

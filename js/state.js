@@ -275,7 +275,7 @@ export async function deleteCustomBannerMedia() {
 const DEFAULT_SETTINGS = {
   userName: '',
   apiKey: '',
-  geminiModel: 'gemini-3.8-flash',
+  geminiModel: 'gemini-2.5-flash',
   notifyAdvanceMinutes: 15,
   soundEnabled: true,
   soundTone: 'crystal',
@@ -351,9 +351,9 @@ class StateManager {
     const loadedSettings = this._load(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS) || {};
     this.settings = { ...DEFAULT_SETTINGS, ...loadedSettings };
     
-    // Auto-migrate deprecated/shut-down models
-    if (this.settings.geminiModel === 'gemini-2.0-flash' || this.settings.geminiModel === 'gemini-1.5-flash') {
-      this.settings.geminiModel = 'gemini-3.8-flash';
+    // Auto-migrate to standardized single default model (gemini-2.5-flash)
+    if (this.settings.geminiModel !== 'gemini-2.5-flash') {
+      this.settings.geminiModel = 'gemini-2.5-flash';
       this._save(STORAGE_KEYS.SETTINGS, this.settings);
     }
 

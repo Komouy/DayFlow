@@ -30,7 +30,7 @@
     if ('caches' in window) {
       caches.keys().then(function(keys) {
         keys.forEach(function(k) {
-          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v5.5') {
+          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.2') {
             console.log('[DayFlow] Purging obsolete cache:', k);
             caches.delete(k);
           }
@@ -744,27 +744,27 @@
             </div>
           </div>
 
-          <!-- Model Selection (Custom Trigger & Bottom Sheet) -->
+          <!-- Model Gemini Default Status Card -->
           <div class="settings-card">
             <div class="settings-row-text" style="margin-bottom:8px;">
-              <span class="settings-row-title">Model Gemini</span>
-              <span class="settings-row-desc">Kecerdasan AI yang memproses jadwal, ringkasan, dan asisten proaktif.</span>
+              <span class="settings-row-title">Model Gemini Default</span>
+              <span class="settings-row-desc">Kecerdasan AI terpadu untuk analisis jadwal, ringkasan, dan asisten proaktif.</span>
             </div>
-            <button type="button" id="btn-open-model-picker" class="custom-select-trigger" aria-haspopup="dialog" aria-expanded="false" aria-label="Pilih Model Gemini">
+            <div class="custom-select-trigger" style="cursor:default; pointer-events:none;">
               <div class="trigger-meta">
-                <div class="trigger-icon-wrap">
+                <div class="trigger-icon-wrap" style="color:var(--accent-primary); background:var(--accent-primary-soft);">
                   <span data-icon="bot" data-icon-size="17"></span>
                 </div>
                 <div class="trigger-text-group">
-                  <span class="trigger-value" id="current-model-name">Gemini 3.8 Flash</span>
-                  <span class="trigger-sub" id="current-model-desc">Paling Cerdas & Cepat — Direkomendasikan</span>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="trigger-value" id="current-model-name">Gemini 2.5 Flash</span>
+                    <span class="model-option-badge" style="background-color:var(--accent-primary-soft); color:var(--accent-primary); border-color:var(--accent-primary-border); font-size:10px; padding:2px 7px;">Aktif & Hemat Kuota</span>
+                  </div>
+                  <span class="trigger-sub" id="current-model-desc">Respon luas, penalaran terperinci & hemat kuota token</span>
                 </div>
               </div>
-              <div class="trigger-chevron">
-                <span data-icon="chevron-down" data-icon-size="16"></span>
-              </div>
-            </button>
-            <input type="hidden" id="setting-model" value="gemini-3.8-flash">
+            </div>
+            <input type="hidden" id="setting-model" value="gemini-2.5-flash">
           </div>
 
           <!-- Theme Preference -->
@@ -1208,89 +1208,6 @@
           <button type="button" class="btn btn-primary" id="confirm-modal-btn-accept" style="flex:1;">
             Lanjutkan
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal: Custom Gemini Model Picker Bottom Sheet -->
-    <div id="modal-picker-model" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="model-picker-title">
-      <div class="bottom-sheet" style="max-width:500px;">
-        <div class="sheet-handle"></div>
-        <div class="sheet-header">
-          <div>
-            <h3 class="sheet-title" id="model-picker-title">Pilih Model Gemini</h3>
-            <p class="text-xs text-muted" style="margin-top:2px;">Disinkronkan dengan kuota akun Google AI Studio</p>
-          </div>
-          <button type="button" class="btn btn-ghost btn-xs btn-icon btn-close-modal" id="btn-close-model-picker" aria-label="Tutup Pilihan Model">
-            <span data-icon="x" data-icon-size="16"></span>
-          </button>
-        </div>
-        
-        <div class="model-picker-list" role="radiogroup" aria-label="Pilihan Model Gemini">
-          <div class="model-picker-option is-active" data-model-id="gemini-3.8-flash">
-            <div class="model-option-info">
-              <div class="model-option-title-row">
-                <span class="model-option-name">Gemini 3.8 Flash</span>
-                <span class="model-option-badge">Direkomendasikan</span>
-              </div>
-              <span class="model-option-desc">Paling cerdas, penalaran tajam & respon instan untuk jadwal</span>
-            </div>
-            <div class="model-option-check">
-              <span data-icon="check" data-icon-size="14"></span>
-            </div>
-          </div>
-
-          <div class="model-picker-option" data-model-id="gemini-3.5-flash-lite">
-            <div class="model-option-info">
-              <div class="model-option-title-row">
-                <span class="model-option-name">Gemini 3.5 Flash-Lite</span>
-                <span class="model-option-badge">Super Hemat Kuota</span>
-              </div>
-              <span class="model-option-desc">Sangat ringan, latensi ultra-rendah dan hemat batas RPM API</span>
-            </div>
-            <div class="model-option-check">
-              <span data-icon="check" data-icon-size="14"></span>
-            </div>
-          </div>
-
-          <div class="model-picker-option" data-model-id="gemini-3.6-flash">
-            <div class="model-option-info">
-              <div class="model-option-title-row">
-                <span class="model-option-name">Gemini 3.6 Flash</span>
-                <span class="model-option-badge">Stabil & Seimbang</span>
-              </div>
-              <span class="model-option-desc">Keseimbangan ideal antara kecepatan dan kapasitas pemahaman teks</span>
-            </div>
-            <div class="model-option-check">
-              <span data-icon="check" data-icon-size="14"></span>
-            </div>
-          </div>
-
-          <div class="model-picker-option" data-model-id="gemini-2.5-flash">
-            <div class="model-option-info">
-              <div class="model-option-title-row">
-                <span class="model-option-name">Gemini 2.5 Flash</span>
-                <span class="model-option-badge">High Volume</span>
-              </div>
-              <span class="model-option-desc">Cadangan andal saat model lain mengalami lonjakan trafik</span>
-            </div>
-            <div class="model-option-check">
-              <span data-icon="check" data-icon-size="14"></span>
-            </div>
-          </div>
-
-          <div class="model-picker-option" data-model-id="gemini-4-argon">
-            <div class="model-option-info">
-              <div class="model-option-title-row">
-                <span class="model-option-name">Gemini 4 Argon</span>
-                <span class="model-option-badge">Flagship 1M Context</span>
-              </div>
-              <span class="model-option-desc">Penalaran kompleks kelas tertinggi dengan konteks 1 juta token</span>
-            </div>
-            <div class="model-option-check">
-              <span data-icon="check" data-icon-size="14"></span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

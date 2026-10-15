@@ -52,7 +52,7 @@ Jika Anda hanya ingin mencoba langsung di lingkungan lokal/demo internal tanpa m
    export const APP_CONFIG = {
      AI_PROXY_URL: '',
      CENTRAL_API_KEY: 'AQ...', // API Key Anda diawali AQ...
-     DEFAULT_MODEL: 'gemini-3.8-flash'
+     DEFAULT_MODEL: 'gemini-2.5-flash'
    };
    ```
 3. DayFlow akan otomatis menggunakan kunci tersebut untuk semua pengguna.

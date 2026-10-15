@@ -20,11 +20,10 @@ const CORS_HEADERS = {
 };
 
 const FALLBACK_MODELS = [
-  'gemini-3.8-flash',
+  'gemini-2.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
-  'gemini-2.5-flash',
-  'gemini-4-argon'
+  'gemini-3.8-flash'
 ];
 
 export default {
@@ -84,7 +83,7 @@ export default {
       const reqBody = await request.json();
       
       // Determine requested model and payload
-      let model = reqBody.model || 'gemini-3.8-flash';
+      let model = reqBody.model || 'gemini-2.5-flash';
       let payload = reqBody.payload || reqBody;
 
       // Extract model from URL path if calling /v1beta/models/:model:generateContent

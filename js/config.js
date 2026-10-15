@@ -17,11 +17,11 @@ export const APP_CONFIG = {
   // Optional: Centralized Shared API Key (Used as fallback if proxy URL is not set yet)
   CENTRAL_API_KEY: '',
 
-  // Default Gemini Intelligence Model
-  DEFAULT_MODEL: 'gemini-3.8-flash',
+  // Default Gemini Intelligence Model (Token-efficient & broad answers)
+  DEFAULT_MODEL: 'gemini-2.5-flash',
 
   // Version identifier
-  VERSION: '6.1.0'
+  VERSION: '6.2.0'
 };
 
 // Allow runtime override via global window object or localStorage for testing

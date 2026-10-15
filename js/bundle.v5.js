@@ -242,7 +242,7 @@
   var DEFAULT_SETTINGS = {
     userName: "",
     apiKey: "",
-    geminiModel: "gemini-3.8-flash",
+    geminiModel: "gemini-2.5-flash",
     notifyAdvanceMinutes: 15,
     soundEnabled: true,
     soundTone: "crystal",
@@ -308,8 +308,8 @@
       }
       const loadedSettings = this._load(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS) || {};
       this.settings = { ...DEFAULT_SETTINGS, ...loadedSettings };
-      if (this.settings.geminiModel === "gemini-2.0-flash" || this.settings.geminiModel === "gemini-1.5-flash") {
-        this.settings.geminiModel = "gemini-3.8-flash";
+      if (this.settings.geminiModel !== "gemini-2.5-flash") {
+        this.settings.geminiModel = "gemini-2.5-flash";
         this._save(STORAGE_KEYS.SETTINGS, this.settings);
       }
       if (!this.settings.hasConfiguredBanner) {
@@ -1416,14 +1416,13 @@ ${message}`));
   // js/config.js
   var APP_CONFIG = {
     // Free & Secure Serverless AI Proxy endpoint (Cloudflare Worker)
-    // Set your Cloudflare Worker URL here once deployed, e.g. 'https://dayflow-ai-proxy.workers.dev'
-    AI_PROXY_URL: "",
+    AI_PROXY_URL: "https://dayflow.dhavinal20.workers.dev",
     // Optional: Centralized Shared API Key (Used as fallback if proxy URL is not set yet)
     CENTRAL_API_KEY: "",
-    // Default Gemini Intelligence Model
-    DEFAULT_MODEL: "gemini-2.0-flash",
+    // Default Gemini Intelligence Model (Token-efficient & broad answers)
+    DEFAULT_MODEL: "gemini-2.5-flash",
     // Version identifier
-    VERSION: "6.1.0"
+    VERSION: "6.2.0"
   };
   if (typeof window !== "undefined") {
     const localProxy = localStorage.getItem("dayflow_proxy_url");
@@ -1468,7 +1467,7 @@ Format ini memudahkan pengguna untuk langsung menyimpan jadwal ke dalam agenda D
       return Boolean(this.getProxyUrl() || this.getApiKey());
     }
     static getModel() {
-      return state.getSettings().geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.0-flash";
+      return state.getSettings().geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.5-flash";
     }
     static buildSystemPrompt() {
       const todaySchedules = state.getTodaySchedules();
@@ -1495,7 +1494,7 @@ Format ini memudahkan pengguna untuk langsung menyimpan jadwal ke dalam agenda D
         throw new Error("Layanan AI belum siap. Konfigurasi AI Gateway atau masukkan API Key di Pengaturan.");
       }
       const primaryModel = this.getModel();
-      const candidateModels = [primaryModel, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"].filter((v, i, a) => a.indexOf(v) === i);
+      const candidateModels = [primaryModel, "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"].filter((v, i, a) => a.indexOf(v) === i);
       let lastError = null;
       if (proxyUrl && !userPersonalKey) {
         for (const model of candidateModels) {
@@ -1784,7 +1783,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         generationConfig: { maxOutputTokens: 20 }
       };
       if (keyToTest && (customKey !== null || !proxyUrl)) {
-        const candidateModels = [this.getModel(), "gemini-2.0-flash", "gemini-1.5-flash"];
+        const candidateModels = [this.getModel(), "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"].filter((v, i, a) => a.indexOf(v) === i);
         for (const model of candidateModels) {
           const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(keyToTest)}`;
           try {
@@ -3587,7 +3586,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const toneSelect = document.getElementById("setting-sound-tone");
       const proactiveToggle = document.getElementById("setting-proactive");
       if (apiInput) apiInput.value = settings.apiKey || "";
-      if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.0-flash";
+      if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.5-flash";
       if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
       const badgeEl = document.getElementById("central-ai-status-badge");
       if (badgeEl) {
@@ -3623,44 +3622,17 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         const val = item.getAttribute("data-tone-val");
         item.classList.toggle("is-active", val === currentTone);
       });
-      this.updateModelPickerUI(settings.geminiModel || "gemini-3.8-flash");
+      this.updateModelPickerUI(settings.geminiModel || "gemini-2.5-flash");
       this.renderBannerSettings(settings);
       this.renderSettingsCategoriesPreview();
     },
-    updateModelPickerUI(modelId) {
+    updateModelPickerUI(modelId = "gemini-2.5-flash") {
       const hiddenInput = document.getElementById("setting-model");
-      if (hiddenInput) hiddenInput.value = modelId;
-      const modelMeta = {
-        "gemini-3.8-flash": {
-          name: "Gemini 3.8 Flash",
-          desc: "Paling Cerdas & Cepat \u2014 Direkomendasikan"
-        },
-        "gemini-3.5-flash-lite": {
-          name: "Gemini 3.5 Flash-Lite",
-          desc: "Super Cepat & Hemat Kuota"
-        },
-        "gemini-3.6-flash": {
-          name: "Gemini 3.6 Flash",
-          desc: "Stabil & Seimbang"
-        },
-        "gemini-2.5-flash": {
-          name: "Gemini 2.5 Flash",
-          desc: "High Volume Reasoning"
-        },
-        "gemini-4-argon": {
-          name: "Gemini 4 Argon",
-          desc: "Flagship Reasoning 1M Context"
-        }
-      };
-      const meta = modelMeta[modelId] || { name: modelId, desc: "Model Gemini" };
+      if (hiddenInput) hiddenInput.value = "gemini-2.5-flash";
       const nameEl = document.getElementById("current-model-name");
       const descEl = document.getElementById("current-model-desc");
-      if (nameEl) nameEl.textContent = meta.name;
-      if (descEl) descEl.textContent = meta.desc;
-      document.querySelectorAll(".model-picker-option").forEach((opt) => {
-        const id = opt.getAttribute("data-model-id");
-        opt.classList.toggle("is-active", id === modelId);
-      });
+      if (nameEl) nameEl.textContent = "Gemini 2.5 Flash";
+      if (descEl) descEl.textContent = "Respon luas, penalaran terperinci & hemat kuota token";
     },
     handleSaveSettings(e) {
       e.preventDefault();
@@ -3684,7 +3656,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         heroBannerQuote: bannerQuoteInput ? bannerQuoteInput.value.trim() : "Fokus pada hal penting hari ini.",
         heroBannerUrl: bannerUrlInput ? bannerUrlInput.value.trim() : "",
         apiKey: apiInput ? apiInput.value.trim() : "",
-        geminiModel: modelSelect ? modelSelect.value : "gemini-3.8-flash",
+        geminiModel: modelSelect ? modelSelect.value : "gemini-2.5-flash",
         notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : "15", 10) || 15,
         soundEnabled: soundToggle ? soundToggle.checked : true,
         soundTone: selectedTone,
@@ -3722,7 +3694,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       try {
         if (apiKey) {
           const res = await GeminiService.testConnection(apiKey);
-          state.updateSettings({ apiKey, geminiModel: res.model });
+          state.updateSettings({ apiKey, geminiModel: res.model || "gemini-2.5-flash" });
           this.renderSettingsView();
           notifications.showToast(`API Key pribadi valid dan tersimpan! (${res.model})`, "success", 5e3);
         } else if (GeminiService.isAiReady()) {
@@ -3740,6 +3712,13 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         testBtn.innerHTML = orig;
         renderIcons();
       }
+    },
+    handleClearSavedApiKey() {
+      state.updateSettings({ apiKey: "" });
+      const apiInput = document.getElementById("setting-api-key");
+      if (apiInput) apiInput.value = "";
+      this.renderSettingsView();
+      notifications.showToast("API Key pribadi telah dihapus dari peramban ini. DayFlow kini aktif menggunakan AI Terpusat.", "success", 5e3);
     },
     handleExportData() {
       const backup = {
@@ -4045,29 +4024,6 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           springBounce(btn);
         });
       });
-      const openModelPickerBtn = document.getElementById("btn-open-model-picker");
-      const modalPickerModel = document.getElementById("modal-picker-model");
-      if (openModelPickerBtn && modalPickerModel) {
-        openModelPickerBtn.addEventListener("click", () => {
-          modalPickerModel.classList.add("open");
-        });
-      }
-      const closeModelPickerBtn = document.getElementById("btn-close-model-picker");
-      if (closeModelPickerBtn && modalPickerModel) {
-        closeModelPickerBtn.addEventListener("click", () => {
-          modalPickerModel.classList.remove("open");
-        });
-      }
-      document.querySelectorAll(".model-picker-option").forEach((option) => {
-        option.addEventListener("click", () => {
-          const modelId = option.getAttribute("data-model-id");
-          this.updateModelPickerUI(modelId);
-          springBounce(option);
-          if (modalPickerModel) {
-            setTimeout(() => modalPickerModel.classList.remove("open"), 160);
-          }
-        });
-      });
       const openApiGuideBtn = document.getElementById("btn-open-api-guide");
       const modalApiGuide = document.getElementById("modal-api-guide");
       if (openApiGuideBtn && modalApiGuide) {
@@ -4087,6 +4043,10 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const testApiBtn = document.getElementById("btn-test-api");
       if (testApiBtn) {
         testApiBtn.addEventListener("click", () => this.handleTestApiKey());
+      }
+      const clearKeyBtn = document.getElementById("btn-clear-api-key");
+      if (clearKeyBtn) {
+        clearKeyBtn.addEventListener("click", () => this.handleClearSavedApiKey());
       }
       const toggleKeyBtn = document.getElementById("btn-toggle-key-visibility");
       const apiKeyInput = document.getElementById("setting-api-key");

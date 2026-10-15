@@ -23,7 +23,7 @@ export const settingsViewMethods = {
     const proactiveToggle = document.getElementById('setting-proactive');
 
     if (apiInput) apiInput.value = settings.apiKey || '';
-    if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || 'gemini-2.0-flash';
+    if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || 'gemini-2.5-flash';
     if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
 
     // Sync Centralized AI Architecture Status Badge
@@ -67,8 +67,8 @@ export const settingsViewMethods = {
       item.classList.toggle('is-active', val === currentTone);
     });
 
-    // Sync custom Gemini Model Picker Trigger & Bottom Sheet Options
-    this.updateModelPickerUI(settings.geminiModel || 'gemini-3.8-flash');
+    // Sync Gemini Model Badge
+    this.updateModelPickerUI(settings.geminiModel || 'gemini-2.5-flash');
 
     // Sync Profile & Hero Banner Settings
     this.renderBannerSettings(settings);
@@ -77,43 +77,14 @@ export const settingsViewMethods = {
     this.renderSettingsCategoriesPreview();
   },
 
-  updateModelPickerUI(modelId) {
+  updateModelPickerUI(modelId = 'gemini-2.5-flash') {
     const hiddenInput = document.getElementById('setting-model');
-    if (hiddenInput) hiddenInput.value = modelId;
+    if (hiddenInput) hiddenInput.value = 'gemini-2.5-flash';
 
-    const modelMeta = {
-      'gemini-3.8-flash': {
-        name: 'Gemini 3.8 Flash',
-        desc: 'Paling Cerdas & Cepat — Direkomendasikan'
-      },
-      'gemini-3.5-flash-lite': {
-        name: 'Gemini 3.5 Flash-Lite',
-        desc: 'Super Cepat & Hemat Kuota'
-      },
-      'gemini-3.6-flash': {
-        name: 'Gemini 3.6 Flash',
-        desc: 'Stabil & Seimbang'
-      },
-      'gemini-2.5-flash': {
-        name: 'Gemini 2.5 Flash',
-        desc: 'High Volume Reasoning'
-      },
-      'gemini-4-argon': {
-        name: 'Gemini 4 Argon',
-        desc: 'Flagship Reasoning 1M Context'
-      }
-    };
-
-    const meta = modelMeta[modelId] || { name: modelId, desc: 'Model Gemini' };
     const nameEl = document.getElementById('current-model-name');
     const descEl = document.getElementById('current-model-desc');
-    if (nameEl) nameEl.textContent = meta.name;
-    if (descEl) descEl.textContent = meta.desc;
-
-    document.querySelectorAll('.model-picker-option').forEach(opt => {
-      const id = opt.getAttribute('data-model-id');
-      opt.classList.toggle('is-active', id === modelId);
-    });
+    if (nameEl) nameEl.textContent = 'Gemini 2.5 Flash';
+    if (descEl) descEl.textContent = 'Respon luas, penalaran terperinci & hemat kuota token';
   },
 
   handleSaveSettings(e) {
@@ -140,7 +111,7 @@ export const settingsViewMethods = {
       heroBannerQuote: bannerQuoteInput ? bannerQuoteInput.value.trim() : 'Fokus pada hal penting hari ini.',
       heroBannerUrl: bannerUrlInput ? bannerUrlInput.value.trim() : '',
       apiKey: apiInput ? apiInput.value.trim() : '',
-      geminiModel: modelSelect ? modelSelect.value : 'gemini-3.8-flash',
+      geminiModel: modelSelect ? modelSelect.value : 'gemini-2.5-flash',
       notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : '15', 10) || 15,
       soundEnabled: soundToggle ? soundToggle.checked : true,
       soundTone: selectedTone,
@@ -192,7 +163,7 @@ export const settingsViewMethods = {
       if (apiKey) {
         // Test user's personal key
         const res = await GeminiService.testConnection(apiKey);
-        state.updateSettings({ apiKey, geminiModel: res.model });
+        state.updateSettings({ apiKey, geminiModel: res.model || 'gemini-2.5-flash' });
         this.renderSettingsView();
         notifications.showToast(`API Key pribadi valid dan tersimpan! (${res.model})`, 'success', 5000);
       } else if (GeminiService.isAiReady()) {

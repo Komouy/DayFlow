@@ -1,10 +1,10 @@
 /**
- * DayFlow Service Worker v6.3
+ * DayFlow Service Worker v6.4
  * Resilient Stale-While-Revalidate offline cache & instant mobile startup.
  * Zero-hang, auto-cache purge on upgrade guarantee.
  */
 
-const CACHE_NAME = 'dayflow-v6.3';
+const CACHE_NAME = 'dayflow-v6.4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

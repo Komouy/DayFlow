@@ -397,7 +397,56 @@
         return this.schedules.filter((s) => s && typeof s === "object").sort((a, b) => (a.time || "").localeCompare(b.time || ""));
       }
       const targetDate = String(filterDate).trim();
-      return this.schedules.filter((s) => s && typeof s === "object" && String(s.date || "").trim() === targetDate).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      const [tY, tM, tD] = targetDate.split("-").map(Number);
+      const targetDayObj = new Date(tY, (tM || 1) - 1, tD || 1);
+      const dayOfWeek = targetDayObj.getDay();
+      const dayOfMonth = tD || targetDayObj.getDate();
+      const matched = [];
+      for (const s of this.schedules) {
+        if (!s || typeof s !== "object") continue;
+        const sDate = String(s.date || "").trim();
+        const rec = s.recurrence || "none";
+        let isMatch = false;
+        if (sDate === targetDate) {
+          isMatch = true;
+        } else if (rec !== "none" && targetDate >= sDate) {
+          if (rec === "daily") {
+            isMatch = true;
+          } else if (rec === "weekdays") {
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+              isMatch = true;
+            }
+          } else if (rec === "weekly") {
+            const [sY, sM, sD] = sDate.split("-").map(Number);
+            const origDayObj = new Date(sY, (sM || 1) - 1, sD || 1);
+            if (dayOfWeek === origDayObj.getDay()) {
+              isMatch = true;
+            }
+          } else if (rec === "monthly") {
+            const [, , sD] = sDate.split("-").map(Number);
+            if (dayOfMonth === sD) {
+              isMatch = true;
+            }
+          }
+        }
+        if (isMatch) {
+          let isDone = false;
+          if (rec !== "none") {
+            const compDates = Array.isArray(s.completedDates) ? s.completedDates : [];
+            isDone = compDates.includes(targetDate);
+          } else {
+            isDone = !!s.completed;
+          }
+          matched.push({
+            ...s,
+            date: targetDate,
+            completed: isDone,
+            isRecurring: rec !== "none",
+            masterDate: sDate
+          });
+        }
+      }
+      return matched.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
     }
     getTodaySchedules() {
       const today = getLocalDateString();
@@ -444,6 +493,8 @@
         priority: ["low", "medium", "high"].includes(scheduleData.priority) ? scheduleData.priority : "medium",
         deadline: scheduleData.deadline ? normalizeDateString(scheduleData.deadline) : null,
         reminder: scheduleData.reminder !== false,
+        recurrence: ["none", "daily", "weekdays", "weekly", "monthly"].includes(scheduleData.recurrence) ? scheduleData.recurrence : "none",
+        completedDates: Array.isArray(scheduleData.completedDates) ? scheduleData.completedDates : [],
         completed: !!scheduleData.completed,
         createdAt: Date.now()
       };
@@ -472,6 +523,8 @@
           priority: ["low", "medium", "high"].includes(item.priority) ? item.priority : "medium",
           deadline: item.deadline ? normalizeDateString(item.deadline) : null,
           reminder: item.reminder !== false,
+          recurrence: ["none", "daily", "weekdays", "weekly", "monthly"].includes(item.recurrence) ? item.recurrence : "none",
+          completedDates: Array.isArray(item.completedDates) ? item.completedDates : [],
           completed: !!item.completed,
           createdAt: baseTime + index
         };
@@ -507,12 +560,23 @@
       }
       return null;
     }
-    toggleScheduleComplete(id) {
+    toggleScheduleComplete(id, targetDate = null) {
       const item = this.schedules.find((s) => s.id === id);
-      if (item) {
+      if (!item) return null;
+      const rec = item.recurrence || "none";
+      if (rec !== "none") {
+        const dateToCheck = targetDate || getLocalDateString();
+        const compDates = Array.isArray(item.completedDates) ? [...item.completedDates] : [];
+        const dateIdx = compDates.indexOf(dateToCheck);
+        if (dateIdx > -1) {
+          compDates.splice(dateIdx, 1);
+        } else {
+          compDates.push(dateToCheck);
+        }
+        return this.updateSchedule(id, { completedDates: compDates });
+      } else {
         return this.updateSchedule(id, { completed: !item.completed });
       }
-      return null;
     }
     deleteSchedule(id) {
       this.schedules = this.schedules.filter((s) => s.id !== id);
@@ -698,7 +762,8 @@
     upload: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>`,
     layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
     share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>`,
-    "external-link": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>`
+    "external-link": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>`,
+    repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`
   };
   function getIcon(name, extraClass = "", size = 18) {
     const svg = icons[name] || icons.circle;
@@ -1672,12 +1737,19 @@ Aturan Pemrosesan:
        - "deadline": null
        - "priority": "medium" (atau "low" untuk istirahat/hiburan).
 
-3. "date": Tanggal pelaksanaan atau agenda (format "YYYY-MM-DD"). Jika pengguna menyebut kegiatan untuk "besok", gunakan "${tomorrowStr}", jika "lusa" gunakan "${lusaStr}", jika tidak disebut khusus gunakan "${dateToUse}".
-4. "time": Waktu kegiatan dalam format 24 jam "HH:MM" (contoh: "08:30", "17:00"). Jika tidak disebutkan secara eksplisit, perkirakan secara realistis mulai dari pagi hari.
-5. "duration": Estimasi durasi dalam menit (integer bulat, default 30).
-6. "category": Pilih salah satu: "Kerja", "Fokus", "Pribadi", "Kesehatan".
-7. DILARANG menggunakan markdown codeblocks seperti \`\`\`json atau teks pengantar apapun. Kembalikan HANYA array JSON murni [ ... ].
-8. DILARANG menggunakan emoji apapun dalam output JSON.
+3. DETEKSI PERULANGAN / RECURRENCE ("recurrence"):
+   - Analisis apakah kegiatan merupakan agenda rutin berulang:
+     * "daily" jika menyebut "setiap hari", "tiap hari", "rutin harian", "setiap pagi/sore".
+     * "weekdays" jika menyebut "hari kerja", "senin sampai jumat".
+     * "weekly" jika menyebut hari berulang seperti "setiap senin", "tiap minggu", "tiap jumat".
+     * "monthly" jika menyebut "setiap bulan", "tiap tanggal [X]".
+     * "none" jika kegiatan satu kali saja (default).
+4. "date": Tanggal pelaksanaan atau agenda (format "YYYY-MM-DD"). Jika pengguna menyebut kegiatan untuk "besok", gunakan "${tomorrowStr}", jika "lusa" gunakan "${lusaStr}", jika tidak disebut khusus gunakan "${dateToUse}".
+5. "time": Waktu kegiatan dalam format 24 jam "HH:MM" (contoh: "08:30", "17:00"). Jika tidak disebutkan secara eksplisit, perkirakan secara realistis mulai dari pagi hari.
+6. "duration": Estimasi durasi dalam menit (integer bulat, default 30).
+7. "category": Pilih salah satu: "Kerja", "Fokus", "Pribadi", "Kesehatan".
+8. DILARANG menggunakan markdown codeblocks seperti \`\`\`json atau teks pengantar apapun. Kembalikan HANYA array JSON murni [ ... ].
+9. DILARANG menggunakan emoji apapun dalam output JSON.
 
 Format Output WAJIB berupa JSON Array valid:
 [
@@ -1687,6 +1759,7 @@ Format Output WAJIB berupa JSON Array valid:
     "time": "HH:MM",
     "duration": 30,
     "category": "Kerja",
+    "recurrence": "none",
     "deadline": "${tomorrowStr}",
     "priority": "high"
   }
@@ -1730,6 +1803,9 @@ Teks Kegiatan dari Pengguna:
           const rawPriority = String(item.priority || item.prioritas || "").toLowerCase().trim();
           const validPriorities = ["high", "medium", "low"];
           const finalPriority = validPriorities.includes(rawPriority) ? rawPriority : cleanDeadline ? "high" : "medium";
+          const rawRecurrence = String(item.recurrence || item.perulangan || "").toLowerCase().trim();
+          const validRecurrence = ["none", "daily", "weekdays", "weekly", "monthly"];
+          const finalRecurrence = validRecurrence.includes(rawRecurrence) ? rawRecurrence : "none";
           return {
             title: String(rawTitle).trim() || "Kegiatan Baru",
             date: normalizeDateString(rawDate, dateToUse),
@@ -1738,7 +1814,8 @@ Teks Kegiatan dari Pengguna:
             category: finalCategory,
             deadline: cleanDeadline,
             priority: finalPriority,
-            reminder: true
+            reminder: true,
+            recurrence: finalRecurrence
           };
         });
       } catch (e) {
@@ -1842,6 +1919,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const toggleReminder = document.getElementById("sch-toggle-reminder");
       let currentCategory = "Kerja";
       let currentPriority = "medium";
+      let currentRecurrence = "none";
       let currentDeadline = "";
       let currentDuration = 30;
       if (scheduleId) {
@@ -1854,6 +1932,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           currentDuration = item.duration || 30;
           currentCategory = item.category || "Kerja";
           currentPriority = item.priority || "medium";
+          currentRecurrence = item.recurrence || "none";
           currentDeadline = item.deadline || "";
           if (toggleReminder) toggleReminder.checked = item.reminder !== false;
         }
@@ -1865,6 +1944,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         currentDuration = 30;
         currentCategory = "Kerja";
         currentPriority = "medium";
+        currentRecurrence = "none";
         currentDeadline = "";
         if (toggleReminder) toggleReminder.checked = true;
       }
@@ -1881,6 +1961,8 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       this.renderModalCategoryRadios(currentCategory);
       const prioRadio = modal.querySelector(`input[name="sch-priority-radio"][value="${currentPriority}"]`);
       if (prioRadio) prioRadio.checked = true;
+      const recRadio = modal.querySelector(`input[name="sch-recurrence-radio"][value="${currentRecurrence}"]`);
+      if (recRadio) recRadio.checked = true;
       modal.classList.add("open");
       setTimeout(() => inputTitle.focus(), 150);
     },
@@ -1894,6 +1976,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const toggleReminder = document.getElementById("sch-toggle-reminder");
       const selectedCategoryRadio = document.querySelector('input[name="sch-category-radio"]:checked');
       const selectedPriorityRadio = document.querySelector('input[name="sch-priority-radio"]:checked');
+      const selectedRecurrenceRadio = document.querySelector('input[name="sch-recurrence-radio"]:checked');
       const title = inputTitle.value.trim();
       if (!title) {
         shakeElement(inputTitle);
@@ -1908,7 +1991,8 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         category: selectedCategoryRadio ? selectedCategoryRadio.value : "Kerja",
         priority: selectedPriorityRadio ? selectedPriorityRadio.value : "medium",
         deadline: inputDeadline && inputDeadline.value ? inputDeadline.value : null,
-        reminder: toggleReminder ? toggleReminder.checked : true
+        reminder: toggleReminder ? toggleReminder.checked : true,
+        recurrence: selectedRecurrenceRadio ? selectedRecurrenceRadio.value : "none"
       };
       if (this.editingScheduleId) {
         state.updateSchedule(this.editingScheduleId, payload);
@@ -2895,12 +2979,13 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         if (toggleBtn) {
           e.stopPropagation();
           const id = toggleBtn.getAttribute("data-id");
-          const sch = state.getSchedules().find((s) => s.id === id);
+          const targetDate = toggleBtn.getAttribute("data-date");
+          const sch = state.getSchedules(targetDate).find((s) => s.id === id);
           if (!sch?.completed) {
             particleBurst(toggleBtn, "var(--status-success)");
           }
           springBounce(toggleBtn);
-          state.toggleScheduleComplete(id);
+          state.toggleScheduleComplete(id, targetDate);
           return;
         }
         const editBtn = target.closest('[data-action="edit-schedule"]');
@@ -3015,6 +3100,17 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           const cInfo = conflicts.get(s.id);
           conflictBadgeHtml = `<span class="deadline-badge is-urgent" style="border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.12); color:var(--status-danger);" title="Jadwal bertabrakan ${cInfo.overlapMinutes} menit dengan '${escapeHtml(cInfo.otherTitle)}'">${getIcon("alert-triangle", "", 11)} Bentrok ${cInfo.overlapMinutes}m</span>`;
         }
+        let recurrenceBadgeHtml = "";
+        if (s.recurrence && s.recurrence !== "none") {
+          const recLabels = {
+            daily: "Tiap Hari",
+            weekdays: "Hari Kerja",
+            weekly: "Mingguan",
+            monthly: "Bulanan"
+          };
+          const label = recLabels[s.recurrence] || "Berulang";
+          recurrenceBadgeHtml = `<span class="recurrence-badge" title="Agenda berulang: ${label}">${getIcon("repeat", "", 11)} ${label}</span>`;
+        }
         const catInfo = state.getCategoryByName(s.category);
         const catColor = catInfo.color || "#f97316";
         const catBadgeHtml = `<span class="schedule-category-badge" style="background-color:${catColor}18; color:${catColor}; border:1px solid ${catColor}38;">
@@ -3042,6 +3138,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
                   <div class="timeline-card-title">${escapeHtml(s.title)}</div>
                   <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                     ${priorityBadgeHtml}
+                    ${recurrenceBadgeHtml}
                     ${deadlineBadgeHtml}
                     ${conflictBadgeHtml}
                   </div>
@@ -3069,6 +3166,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
                   <button class="btn btn-ghost btn-xs btn-check ${s.completed ? "is-done" : ""}" 
                           data-action="toggle-complete" 
                           data-id="${s.id}" 
+                          data-date="${s.date}"
                           title="${s.completed ? "Tandai belum selesai" : "Tandai selesai"}">
                     ${getIcon(s.completed ? "check-circle" : "circle", "", 14)}
                     <span>${s.completed ? "Selesai" : "Check"}</span>

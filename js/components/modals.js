@@ -26,6 +26,7 @@ export const modalMethods = {
 
     let currentCategory = 'Kerja';
     let currentPriority = 'medium';
+    let currentRecurrence = 'none';
     let currentDeadline = '';
     let currentDuration = 30;
 
@@ -39,6 +40,7 @@ export const modalMethods = {
         currentDuration = item.duration || 30;
         currentCategory = item.category || 'Kerja';
         currentPriority = item.priority || 'medium';
+        currentRecurrence = item.recurrence || 'none';
         currentDeadline = item.deadline || '';
         if (toggleReminder) toggleReminder.checked = item.reminder !== false;
       }
@@ -50,6 +52,7 @@ export const modalMethods = {
       currentDuration = 30;
       currentCategory = 'Kerja';
       currentPriority = 'medium';
+      currentRecurrence = 'none';
       currentDeadline = '';
       if (toggleReminder) toggleReminder.checked = true;
     }
@@ -74,6 +77,10 @@ export const modalMethods = {
     const prioRadio = modal.querySelector(`input[name="sch-priority-radio"][value="${currentPriority}"]`);
     if (prioRadio) prioRadio.checked = true;
 
+    // Sync recurrence radio buttons
+    const recRadio = modal.querySelector(`input[name="sch-recurrence-radio"][value="${currentRecurrence}"]`);
+    if (recRadio) recRadio.checked = true;
+
     modal.classList.add('open');
     setTimeout(() => inputTitle.focus(), 150);
   },
@@ -88,6 +95,7 @@ export const modalMethods = {
     const toggleReminder = document.getElementById('sch-toggle-reminder');
     const selectedCategoryRadio = document.querySelector('input[name="sch-category-radio"]:checked');
     const selectedPriorityRadio = document.querySelector('input[name="sch-priority-radio"]:checked');
+    const selectedRecurrenceRadio = document.querySelector('input[name="sch-recurrence-radio"]:checked');
 
     const title = inputTitle.value.trim();
     if (!title) {
@@ -104,7 +112,8 @@ export const modalMethods = {
       category: selectedCategoryRadio ? selectedCategoryRadio.value : 'Kerja',
       priority: selectedPriorityRadio ? selectedPriorityRadio.value : 'medium',
       deadline: inputDeadline && inputDeadline.value ? inputDeadline.value : null,
-      reminder: toggleReminder ? toggleReminder.checked : true
+      reminder: toggleReminder ? toggleReminder.checked : true,
+      recurrence: selectedRecurrenceRadio ? selectedRecurrenceRadio.value : 'none'
     };
 
     if (this.editingScheduleId) {

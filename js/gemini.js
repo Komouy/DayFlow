@@ -295,12 +295,19 @@ Aturan Pemrosesan:
        - "deadline": null
        - "priority": "medium" (atau "low" untuk istirahat/hiburan).
 
-3. "date": Tanggal pelaksanaan atau agenda (format "YYYY-MM-DD"). Jika pengguna menyebut kegiatan untuk "besok", gunakan "${tomorrowStr}", jika "lusa" gunakan "${lusaStr}", jika tidak disebut khusus gunakan "${dateToUse}".
-4. "time": Waktu kegiatan dalam format 24 jam "HH:MM" (contoh: "08:30", "17:00"). Jika tidak disebutkan secara eksplisit, perkirakan secara realistis mulai dari pagi hari.
-5. "duration": Estimasi durasi dalam menit (integer bulat, default 30).
-6. "category": Pilih salah satu: "Kerja", "Fokus", "Pribadi", "Kesehatan".
-7. DILARANG menggunakan markdown codeblocks seperti \`\`\`json atau teks pengantar apapun. Kembalikan HANYA array JSON murni [ ... ].
-8. DILARANG menggunakan emoji apapun dalam output JSON.
+3. DETEKSI PERULANGAN / RECURRENCE ("recurrence"):
+   - Analisis apakah kegiatan merupakan agenda rutin berulang:
+     * "daily" jika menyebut "setiap hari", "tiap hari", "rutin harian", "setiap pagi/sore".
+     * "weekdays" jika menyebut "hari kerja", "senin sampai jumat".
+     * "weekly" jika menyebut hari berulang seperti "setiap senin", "tiap minggu", "tiap jumat".
+     * "monthly" jika menyebut "setiap bulan", "tiap tanggal [X]".
+     * "none" jika kegiatan satu kali saja (default).
+4. "date": Tanggal pelaksanaan atau agenda (format "YYYY-MM-DD"). Jika pengguna menyebut kegiatan untuk "besok", gunakan "${tomorrowStr}", jika "lusa" gunakan "${lusaStr}", jika tidak disebut khusus gunakan "${dateToUse}".
+5. "time": Waktu kegiatan dalam format 24 jam "HH:MM" (contoh: "08:30", "17:00"). Jika tidak disebutkan secara eksplisit, perkirakan secara realistis mulai dari pagi hari.
+6. "duration": Estimasi durasi dalam menit (integer bulat, default 30).
+7. "category": Pilih salah satu: "Kerja", "Fokus", "Pribadi", "Kesehatan".
+8. DILARANG menggunakan markdown codeblocks seperti \`\`\`json atau teks pengantar apapun. Kembalikan HANYA array JSON murni [ ... ].
+9. DILARANG menggunakan emoji apapun dalam output JSON.
 
 Format Output WAJIB berupa JSON Array valid:
 [
@@ -310,6 +317,7 @@ Format Output WAJIB berupa JSON Array valid:
     "time": "HH:MM",
     "duration": 30,
     "category": "Kerja",
+    "recurrence": "none",
     "deadline": "${tomorrowStr}",
     "priority": "high"
   }
@@ -368,6 +376,11 @@ Teks Kegiatan dari Pengguna:
           ? rawPriority
           : (cleanDeadline ? 'high' : 'medium');
 
+        // Clean & validate recurrence
+        const rawRecurrence = String(item.recurrence || item.perulangan || '').toLowerCase().trim();
+        const validRecurrence = ['none', 'daily', 'weekdays', 'weekly', 'monthly'];
+        const finalRecurrence = validRecurrence.includes(rawRecurrence) ? rawRecurrence : 'none';
+
         return {
           title: String(rawTitle).trim() || 'Kegiatan Baru',
           date: normalizeDateString(rawDate, dateToUse),
@@ -376,7 +389,8 @@ Teks Kegiatan dari Pengguna:
           category: finalCategory,
           deadline: cleanDeadline,
           priority: finalPriority,
-          reminder: true
+          reminder: true,
+          recurrence: finalRecurrence
         };
       });
     } catch (e) {

@@ -163,12 +163,13 @@ export const scheduleViewMethods = {
       if (toggleBtn) {
         e.stopPropagation();
         const id = toggleBtn.getAttribute('data-id');
-        const sch = state.getSchedules().find(s => s.id === id);
+        const targetDate = toggleBtn.getAttribute('data-date');
+        const sch = state.getSchedules(targetDate).find(s => s.id === id);
         if (!sch?.completed) {
           particleBurst(toggleBtn, 'var(--status-success)');
         }
         springBounce(toggleBtn);
-        state.toggleScheduleComplete(id);
+        state.toggleScheduleComplete(id, targetDate);
         return;
       }
 
@@ -301,6 +302,19 @@ export const scheduleViewMethods = {
         conflictBadgeHtml = `<span class="deadline-badge is-urgent" style="border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.12); color:var(--status-danger);" title="Jadwal bertabrakan ${cInfo.overlapMinutes} menit dengan '${escapeHtml(cInfo.otherTitle)}'">${getIcon('alert-triangle', '', 11)} Bentrok ${cInfo.overlapMinutes}m</span>`;
       }
 
+      // Recurrence badge
+      let recurrenceBadgeHtml = '';
+      if (s.recurrence && s.recurrence !== 'none') {
+        const recLabels = {
+          daily: 'Tiap Hari',
+          weekdays: 'Hari Kerja',
+          weekly: 'Mingguan',
+          monthly: 'Bulanan'
+        };
+        const label = recLabels[s.recurrence] || 'Berulang';
+        recurrenceBadgeHtml = `<span class="recurrence-badge" title="Agenda berulang: ${label}">${getIcon('repeat', '', 11)} ${label}</span>`;
+      }
+
       const catInfo = state.getCategoryByName(s.category);
       const catColor = catInfo.color || '#f97316';
       const catBadgeHtml = `<span class="schedule-category-badge" style="background-color:${catColor}18; color:${catColor}; border:1px solid ${catColor}38;">
@@ -330,6 +344,7 @@ export const scheduleViewMethods = {
                   <div class="timeline-card-title">${escapeHtml(s.title)}</div>
                   <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
                     ${priorityBadgeHtml}
+                    ${recurrenceBadgeHtml}
                     ${deadlineBadgeHtml}
                     ${conflictBadgeHtml}
                   </div>
@@ -357,6 +372,7 @@ export const scheduleViewMethods = {
                   <button class="btn btn-ghost btn-xs btn-check ${s.completed ? 'is-done' : ''}" 
                           data-action="toggle-complete" 
                           data-id="${s.id}" 
+                          data-date="${s.date}"
                           title="${s.completed ? 'Tandai belum selesai' : 'Tandai selesai'}">
                     ${getIcon(s.completed ? 'check-circle' : 'circle', '', 14)}
                     <span>${s.completed ? 'Selesai' : 'Check'}</span>

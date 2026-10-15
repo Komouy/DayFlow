@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Stylesheet (Versioned & Inlined Design Tokens) -->
-  <link rel="stylesheet" href="/css/style.v5.css?v=6.3">
+  <link rel="stylesheet" href="/css/style.v5.css?v=6.4">
 
   <!-- Early Safe Proxy: Guarantees button clicks and tabs work immediately with zero latency -->
   <script>
@@ -30,7 +30,7 @@
     if ('caches' in window) {
       caches.keys().then(function(keys) {
         keys.forEach(function(k) {
-          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.3') {
+          if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.4') {
             console.log('[DayFlow] Purging obsolete cache:', k);
             caches.delete(k);
           }
@@ -1126,7 +1126,44 @@
             </div>
           </div>
 
-          <!-- 6. Opsi Tambahan: Tenggat & Pengingat -->
+          <!-- 6. Perulangan Jadwal (Recurrence) -->
+          <div class="form-group">
+            <label class="form-label" style="margin-bottom:6px;">Ulangi Jadwal</label>
+            <div class="priority-radio-grid" id="sch-recurrence-radio-group" style="grid-template-columns: repeat(3, 1fr); gap:6px;">
+              <label class="priority-radio-item">
+                <input type="radio" name="sch-recurrence-radio" value="none" checked>
+                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                  Hanya Sekali
+                </span>
+              </label>
+              <label class="priority-radio-item">
+                <input type="radio" name="sch-recurrence-radio" value="daily">
+                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                  Setiap Hari
+                </span>
+              </label>
+              <label class="priority-radio-item">
+                <input type="radio" name="sch-recurrence-radio" value="weekdays">
+                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                  Hari Kerja (Sen-Jum)
+                </span>
+              </label>
+              <label class="priority-radio-item">
+                <input type="radio" name="sch-recurrence-radio" value="weekly">
+                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                  Mingguan
+                </span>
+              </label>
+              <label class="priority-radio-item">
+                <input type="radio" name="sch-recurrence-radio" value="monthly">
+                <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                  Bulanan
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 7. Opsi Tambahan: Tenggat & Pengingat -->
           <div class="modal-subcard">
             <div class="form-group" style="margin-bottom:0;">
               <label class="form-label" for="sch-input-deadline" style="font-size:12px; margin-bottom:4px;">Tenggat Waktu / Deadline (Opsional)</label>

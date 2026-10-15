@@ -461,9 +461,63 @@ class StateManager {
         .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     }
     const targetDate = String(filterDate).trim();
-    return this.schedules
-      .filter(s => s && typeof s === 'object' && String(s.date || '').trim() === targetDate)
-      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const [tY, tM, tD] = targetDate.split('-').map(Number);
+    const targetDayObj = new Date(tY, (tM || 1) - 1, tD || 1);
+    const dayOfWeek = targetDayObj.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+    const dayOfMonth = tD || targetDayObj.getDate();
+
+    const matched = [];
+
+    for (const s of this.schedules) {
+      if (!s || typeof s !== 'object') continue;
+      const sDate = String(s.date || '').trim();
+      const rec = s.recurrence || 'none';
+
+      let isMatch = false;
+
+      if (sDate === targetDate) {
+        isMatch = true;
+      } else if (rec !== 'none' && targetDate >= sDate) {
+        if (rec === 'daily') {
+          isMatch = true;
+        } else if (rec === 'weekdays') {
+          if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+            isMatch = true;
+          }
+        } else if (rec === 'weekly') {
+          const [sY, sM, sD] = sDate.split('-').map(Number);
+          const origDayObj = new Date(sY, (sM || 1) - 1, sD || 1);
+          if (dayOfWeek === origDayObj.getDay()) {
+            isMatch = true;
+          }
+        } else if (rec === 'monthly') {
+          const [, , sD] = sDate.split('-').map(Number);
+          if (dayOfMonth === sD) {
+            isMatch = true;
+          }
+        }
+      }
+
+      if (isMatch) {
+        let isDone = false;
+        if (rec !== 'none') {
+          const compDates = Array.isArray(s.completedDates) ? s.completedDates : [];
+          isDone = compDates.includes(targetDate);
+        } else {
+          isDone = !!s.completed;
+        }
+
+        matched.push({
+          ...s,
+          date: targetDate,
+          completed: isDone,
+          isRecurring: rec !== 'none',
+          masterDate: sDate
+        });
+      }
+    }
+
+    return matched.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }
 
   getTodaySchedules() {
@@ -517,6 +571,8 @@ class StateManager {
       priority: ['low', 'medium', 'high'].includes(scheduleData.priority) ? scheduleData.priority : 'medium',
       deadline: scheduleData.deadline ? normalizeDateString(scheduleData.deadline) : null,
       reminder: scheduleData.reminder !== false,
+      recurrence: ['none', 'daily', 'weekdays', 'weekly', 'monthly'].includes(scheduleData.recurrence) ? scheduleData.recurrence : 'none',
+      completedDates: Array.isArray(scheduleData.completedDates) ? scheduleData.completedDates : [],
       completed: !!scheduleData.completed,
       createdAt: Date.now()
     };
@@ -549,6 +605,8 @@ class StateManager {
         priority: ['low', 'medium', 'high'].includes(item.priority) ? item.priority : 'medium',
         deadline: item.deadline ? normalizeDateString(item.deadline) : null,
         reminder: item.reminder !== false,
+        recurrence: ['none', 'daily', 'weekdays', 'weekly', 'monthly'].includes(item.recurrence) ? item.recurrence : 'none',
+        completedDates: Array.isArray(item.completedDates) ? item.completedDates : [],
         completed: !!item.completed,
         createdAt: baseTime + index
       };
@@ -593,12 +651,24 @@ class StateManager {
     return null;
   }
 
-  toggleScheduleComplete(id) {
+  toggleScheduleComplete(id, targetDate = null) {
     const item = this.schedules.find(s => s.id === id);
-    if (item) {
+    if (!item) return null;
+
+    const rec = item.recurrence || 'none';
+    if (rec !== 'none') {
+      const dateToCheck = targetDate || getLocalDateString();
+      const compDates = Array.isArray(item.completedDates) ? [...item.completedDates] : [];
+      const dateIdx = compDates.indexOf(dateToCheck);
+      if (dateIdx > -1) {
+        compDates.splice(dateIdx, 1);
+      } else {
+        compDates.push(dateToCheck);
+      }
+      return this.updateSchedule(id, { completedDates: compDates });
+    } else {
       return this.updateSchedule(id, { completed: !item.completed });
     }
-    return null;
   }
 
   deleteSchedule(id) {

@@ -508,6 +508,24 @@ class AppController {
       });
     }
 
+    // Refresh page button in header (proactively checks PWA updates & reloads)
+    const btnRefresh = document.getElementById('btn-refresh-page');
+    if (btnRefresh) {
+      btnRefresh.addEventListener('click', async () => {
+        springBounce(btnRefresh);
+        notifications.showToast('Memuat ulang aplikasi...', 'info', 1200);
+        if ('serviceWorker' in navigator) {
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(r => r.update()));
+          } catch (e) {}
+        }
+        setTimeout(() => {
+          window.location.reload();
+        }, 200);
+      });
+    }
+
     // Theme quick toggle in header
     const btnToggleTheme = document.getElementById('btn-toggle-theme');
     if (btnToggleTheme) {

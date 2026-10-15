@@ -37,31 +37,44 @@ export const aiPlanViewMethods = {
       if (!chunk || chunk.length < 3) continue;
 
       const lower = chunk.toLowerCase();
-      const isTomorrow = /\bbesok\b|\besok\b/.test(lower) && !/\bhari ini\b/.test(lower);
-      const isLusa = /\blusa\b/.test(lower);
-      let itemDate = targetDate || today;
+      const indMonths = {
+        januari: '01', jan: '01', februari: '02', feb: '02', maret: '03', mar: '03', april: '04', apr: '04',
+        mei: '05', juni: '06', jun: '06', juli: '07', jul: '07', agustus: '08', agu: '08', ags: '08',
+        september: '09', sep: '09', oktober: '10', okt: '10', november: '11', nov: '11', desember: '12', des: '12'
+      };
 
-      if (isLusa) {
-        itemDate = lusaStr;
-      } else if (isTomorrow) {
-        itemDate = tomorrowStr;
-      }
-
-      // Check specific day mentions: senin, selasa, rabu, kamis, jumat, sabtu, minggu
-      const dayMap = { 'minggu': 0, 'senin': 1, 'selasa': 2, 'rabu': 3, 'kamis': 4, 'jumat': 5, "jum'at": 5, 'sabtu': 6 };
-      for (const [dayName, dayIdx] of Object.entries(dayMap)) {
-        if (new RegExp(`\\b(?:hari\\s+)?${dayName}\\b`, 'i').test(lower)) {
-          const nowObj = new Date();
-          let diff = dayIdx - nowObj.getDay();
-          if (diff <= 0) diff += 7;
-          const targetDay = new Date(nowObj);
-          targetDay.setDate(targetDay.getDate() + diff);
-          itemDate = getLocalDateString(targetDay);
-          break;
+      // 1. Check explicit Indonesian date: "16 Oktober 2026", "25 Des", "17 Agustus"
+      const explicitDateMatch = chunk.match(/\b(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|ags|sep|okt|nov|des)(?:\s+(\d{4}))?\b/i);
+      if (explicitDateMatch) {
+        const d = explicitDateMatch[1].padStart(2, '0');
+        const m = indMonths[explicitDateMatch[2].toLowerCase()] || '01';
+        const y = explicitDateMatch[3] || new Date().getFullYear();
+        itemDate = `${y}-${m}-${d}`;
+      } else {
+        const isTomorrow = /\bbesok\b|\besok\b/.test(lower) && !/\bhari ini\b/.test(lower);
+        const isLusa = /\blusa\b/.test(lower);
+        if (isLusa) {
+          itemDate = lusaStr;
+        } else if (isTomorrow) {
+          itemDate = tomorrowStr;
+        } else {
+          // Check specific day mentions: senin, selasa, rabu, kamis, jumat, sabtu, minggu
+          const dayMap = { 'minggu': 0, 'senin': 1, 'selasa': 2, 'rabu': 3, 'kamis': 4, 'jumat': 5, "jum'at": 5, 'sabtu': 6 };
+          for (const [dayName, dayIdx] of Object.entries(dayMap)) {
+            if (new RegExp(`\\b(?:hari\\s+)?${dayName}\\b`, 'i').test(lower)) {
+              const nowObj = new Date();
+              let diff = dayIdx - nowObj.getDay();
+              if (diff <= 0) diff += 7;
+              const targetDay = new Date(nowObj);
+              targetDay.setDate(targetDay.getDate() + diff);
+              itemDate = getLocalDateString(targetDay);
+              break;
+            }
+          }
         }
       }
 
-      // Check time representation: "jam 5 sore", "jam 8 malam", "08:30 - 10:00", "pukul 14.00"
+      // Check time representation: "jam 5 sore", "jam 8 malam", "08:30 - 10:00", "08.00 - selesai"
       const hasMalam = /\bmalam\b/.test(lower);
       const hasSore = /\bsore\b/.test(lower);
       const hasSiang = /\bsiang\b/.test(lower);
@@ -71,21 +84,42 @@ export const aiPlanViewMethods = {
       let duration = 30;
       let matchedTime = false;
 
-      // 1. Check time range: 08:00 - 09:30 or 14.00 - 15.30
-      const rangeMatch = chunk.match(/(?:(?:pukul|jam)\s*)?([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*(?:-|sampai|sd|s\/d|—)\s*([01]?\d|2[0-3])[:.]([0-5]\d))/i);
+      // 1. Check time range: 08:00 - 09:30 or 14.00 - 15.30 or 08.00 - selesai / sampai selesai
+      const rangeMatch = chunk.match(/(?:(?:pukul|jam)\s*)?([01]?\d|2[0-3])[:.]([0-5]\d)(?:\s*(?:-|sampai|sd|s\/d|—|hingga)\s*(?:([01]?\d|2[0-3])[:.]([0-5]\d)|selesai|finish|done|tuntas))/i);
       if (rangeMatch) {
         const startH = String(parseInt(rangeMatch[1], 10)).padStart(2, '0');
         const startM = String(parseInt(rangeMatch[2], 10)).padStart(2, '0');
         startTime = `${startH}:${startM}`;
-        const endH = parseInt(rangeMatch[3], 10);
-        const endM = parseInt(rangeMatch[4], 10);
-        const diffMinutes = (endH * 60 + endM) - (parseInt(startH, 10) * 60 + parseInt(startM, 10));
-        if (diffMinutes > 0 && diffMinutes <= 720) {
-          duration = diffMinutes;
+        if (rangeMatch[3] && rangeMatch[4]) {
+          const endH = parseInt(rangeMatch[3], 10);
+          const endM = parseInt(rangeMatch[4], 10);
+          const diffMinutes = (endH * 60 + endM) - (parseInt(startH, 10) * 60 + parseInt(startM, 10));
+          if (diffMinutes > 0 && diffMinutes <= 720) {
+            duration = diffMinutes;
+          }
+        } else {
+          // Open-ended "sampai selesai" -> default 120 minutes (common for lectures/seminars)
+          duration = 120;
         }
         matchedTime = true;
-      } else {
-        // 2. Check Indonesian period time: "jam 5 sore", "jam 8 malam", "pukul 10 pagi", "jam 14:00"
+      }
+
+      // 2. Check "jam 8 - selesai" or "pukul 8 sampai selesai"
+      if (!matchedTime) {
+        const hourSelesaiMatch = chunk.match(/(?:(?:pukul|jam)\s*)(\d{1,2})(?:\s*(?:-|sampai|sd|s\/d|—|hingga)\s*(?:selesai|finish|done|tuntas))/i);
+        if (hourSelesaiMatch) {
+          let h = parseInt(hourSelesaiMatch[1], 10);
+          if (hasSore && h < 12) h += 12;
+          if (hasMalam && h < 12 && h > 4) h += 12;
+          if (hasSiang && h >= 1 && h <= 5) h += 12;
+          startTime = `${String(Math.min(23, Math.max(0, h))).padStart(2, '0')}:00`;
+          duration = 120;
+          matchedTime = true;
+        }
+      }
+
+      // 3. Check Indonesian period time: "jam 5 sore", "jam 8 malam", "pukul 10 pagi", "jam 14:00"
+      if (!matchedTime) {
         const indPeriodMatch = chunk.match(/(?:pukul|jam)\s*(\d{1,2})(?:[:.](\d{2}))?(?:\s*(pagi|siang|sore|malam))?/i);
         if (indPeriodMatch) {
           let h = parseInt(indPeriodMatch[1], 10);
@@ -101,24 +135,26 @@ export const aiPlanViewMethods = {
 
           startTime = `${String(Math.min(23, Math.max(0, h))).padStart(2, '0')}:${String(Math.min(59, Math.max(0, m))).padStart(2, '0')}`;
           matchedTime = true;
-        } else {
-          // 3. Fallback standard HH:MM
-          const stdMatch = chunk.match(/([01]?\d|2[0-3])[:.]([0-5]\d)/);
-          if (stdMatch) {
-            startTime = `${String(parseInt(stdMatch[1], 10)).padStart(2, '0')}:${stdMatch[2]}`;
-            matchedTime = true;
-          }
         }
+      }
 
-        // Check explicit duration
-        const durMatch = chunk.match(/\b(\d+)\s*(?:menit|mins?|m)\b/i);
-        if (durMatch) {
-          duration = parseInt(durMatch[1], 10);
-        } else {
-          const jamMatch = chunk.match(/\b(\d+)\s*(?:jam|hours?|h)\b/i);
-          if (jamMatch) {
-            duration = parseInt(jamMatch[1], 10) * 60;
-          }
+      // 4. Fallback standard HH:MM
+      if (!matchedTime) {
+        const stdMatch = chunk.match(/([01]?\d|2[0-3])[:.]([0-5]\d)/);
+        if (stdMatch) {
+          startTime = `${String(parseInt(stdMatch[1], 10)).padStart(2, '0')}:${stdMatch[2]}`;
+          matchedTime = true;
+        }
+      }
+
+      // Check explicit duration
+      const durMatch = chunk.match(/\b(\d+)\s*(?:menit|mins?|m)\b/i);
+      if (durMatch) {
+        duration = parseInt(durMatch[1], 10);
+      } else {
+        const jamMatch = chunk.match(/\b(\d+)\s*(?:jam|hours?|h)\b/i);
+        if (jamMatch) {
+          duration = parseInt(jamMatch[1], 10) * 60;
         }
       }
 
@@ -147,22 +183,30 @@ export const aiPlanViewMethods = {
       // Infer category
       let category = isDeadline ? 'Kerja' : 'Fokus';
       if (/kesehatan|olahraga|jogging|lari|gym|sehat|tidur|istirahat|meditasi/i.test(chunk)) category = 'Kesehatan';
-      else if (/kerja|kantor|meeting|rapat|proyek|klien|tugas|evaluasi|koding|coding|skripsi|laporan|magang|revisi/i.test(chunk)) category = 'Kerja';
+      else if (/kerja|kantor|meeting|rapat|proyek|klien|tugas|evaluasi|koding|coding|skripsi|laporan|magang|revisi|kuliah|matkul|ddp|kampus|dosen/i.test(chunk)) category = 'Kerja';
       else if (/pribadi|makan|sarapan|santai|keluarga|hobi|belanja|jalan|nonton|film|bioskop/i.test(chunk)) category = 'Pribadi';
 
       // Auto-paraphrase title
       let title = chunk;
+      // Strip emojis
+      title = title.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}]/gu, ' ');
       // Strip bullets, list numbers
       title = title.replace(/^[\s\t*•-]+/, '').replace(/^\d+[\s.)-]+\s*/, '');
-      // Strip time expressions
-      title = title.replace(/(?:(?:pukul|jam)\s*)?[012]?\d[:.][0-5]\d(?:\s*(?:-|sampai|sd|s\/d|—)\s*[012]?\d[:.][0-5]\d)?/gi, '');
-      title = title.replace(/(?:pukul|jam)\s*\d{1,2}(?:\s*(?:pagi|siang|sore|malam))?/gi, '');
-      title = title.replace(/\b\d+\s*(?:menit|mins?|jam|hours?)\b/gi, '');
+      // Strip time expressions and "sampai selesai"
+      title = title.replace(/(?:(?:pukul|jam)\s*)?[012]?\d[:.][0-5]\d(?:\s*(?:-|sampai|sd|s\/d|—|hingga)\s*(?:[012]?\d[:.][0-5]\d|selesai|finish|done|tuntas))?/gi, ' ');
+      title = title.replace(/(?:pukul|jam)\s*\d{1,2}(?:\s*(?:-|sampai|sd|s\/d|—|hingga)\s*(?:selesai|finish|done|tuntas))?/gi, ' ');
+      title = title.replace(/(?:pukul|jam)\s*\d{1,2}(?:\s*(?:pagi|siang|sore|malam))?/gi, ' ');
+      title = title.replace(/(?:-|sampai|sd|s\/d|—|hingga)\s*(?:selesai|finish|done|tuntas)/gi, ' ');
+      title = title.replace(/\b(?:selesai|finish|done|tuntas)\b/gi, ' ');
+      title = title.replace(/\b\d+\s*(?:menit|mins?|jam|hours?)\b/gi, ' ');
+      // Strip explicit dates & day names
+      title = title.replace(/\b(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|jun|jul|agu|ags|sep|okt|nov|des)(?:\s+(\d{4}))?\b/gi, ' ');
       // Strip conversational noise and trigger prefixes
-      title = title.replace(/\b(?:tolong(?:\s+dong)?|ingetin(?:\s+aku)?|ingatkan(?:\s+aku)?|jangan\s+lupa(?:\s+ya)?|pliss?|please|aku\s+mau|mau|rencananya|nanti(?:\s+malam|\s+siang|\s+sore)?|harus\s+banget|harus|wajib|kudu|kayaknya|paling\s+lambat|paling\s+lama|deadline(?:\s+nya)?|tenggat(?:\s+waktu)?)\b/gi, '');
+      title = title.replace(/\b(?:izin\s+mengingatkan(?:\s+jadwal)?|mengingatkan|jadwal(?:\s+mata\s+kuliah)?|mata\s+kuliah|matkul)\b/gi, ' ');
+      title = title.replace(/\b(?:tolong(?:\s+dong)?|ingetin(?:\s+aku)?|ingatkan(?:\s+aku)?|jangan\s+lupa(?:\s+ya)?|pliss?|please|aku\s+mau|mau|rencananya|nanti(?:\s+malam|\s+siang|\s+sore)?|harus\s+banget|harus|wajib|kudu|kayaknya|paling\s+lambat|paling\s+lama|deadline(?:\s+nya)?|tenggat(?:\s+waktu)?)\b/gi, ' ');
       // Strip recurrence keywords from title
-      title = title.replace(/\b(?:setiap|tiap)\s+(?:hari|pagi|siang|sore|malam|minggu|bulan|senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\b/gi, '');
-      title = title.replace(/\b(?:rutin\s+harian|sehari-hari|seminggu\s+sekali|sebulan\s+sekali|hari\s+kerja)\b/gi, '');
+      title = title.replace(/\b(?:setiap|tiap)\s+(?:hari|pagi|siang|sore|malam|minggu|bulan|senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\b/gi, ' ');
+      title = title.replace(/\b(?:rutin\s+harian|sehari-hari|seminggu\s+sekali|sebulan\s+sekali|hari\s+kerja)\b/gi, ' ');
       // Strip relative dates and day names from title
       title = title.replace(/\b(?:besok(?:\s+pagi|\s+siang|\s+sore|\s+malam)?|lusa|hari\s+ini|semalam)\b/gi, '');
       title = title.replace(/\b(?:hari\s+)?(?:senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\b/gi, '');

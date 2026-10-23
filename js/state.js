@@ -114,7 +114,8 @@ const STORAGE_KEYS = {
   NOTES: 'dayflow_notes_v1',
   SETTINGS: 'dayflow_settings_v1',
   CHAT_HISTORY: 'dayflow_chat_history_v1',
-  CATEGORIES: 'dayflow_categories_v1'
+  CATEGORIES: 'dayflow_categories_v1',
+  DAILY_LOGS: 'dayflow_daily_logs_v1'
 };
 
 // Default system categories
@@ -280,6 +281,7 @@ const DEFAULT_SETTINGS = {
   soundEnabled: true,
   soundTone: 'crystal',
   proactiveReminders: true,
+  systemNotificationsEnabled: true,
   theme: 'dark',
   heroBannerEnabled: false,
   hasConfiguredBanner: false,
@@ -299,6 +301,7 @@ class StateManager {
     this.schedules = this._load(STORAGE_KEYS.SCHEDULES, DEFAULT_SCHEDULES) || [];
     this.notes = this._load(STORAGE_KEYS.NOTES, DEFAULT_NOTES) || [];
     this.categories = this._load(STORAGE_KEYS.CATEGORIES, DEFAULT_CATEGORIES) || DEFAULT_CATEGORIES;
+    this.dailyLogs = this._load(STORAGE_KEYS.DAILY_LOGS, []) || [];
 
     // Auto-clean legacy dummy seed schedules (sch_1..sch_4)
     const DUMMY_SCHEDULE_IDS = ['sch_1', 'sch_2', 'sch_3', 'sch_4'];
@@ -418,6 +421,14 @@ class StateManager {
       }
     } catch (e) {
       console.warn('Chat sanitization error:', e);
+    }
+
+    // Initialize daily productivity & midnight settlement
+    try {
+      this.checkMidnightRollover();
+      this.syncDailyProductivity();
+    } catch (e) {
+      console.warn('Productivity init error:', e);
     }
   }
 
@@ -580,6 +591,7 @@ class StateManager {
     };
     this.schedules.push(newSchedule);
     this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+    this.syncDailyProductivity(safeDate);
     this.notify('schedule:added', newSchedule);
     return newSchedule;
   }
@@ -619,6 +631,8 @@ class StateManager {
     if (newSchedules.length > 0) {
       this.schedules.push(...newSchedules);
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+      const uniqueDates = [...new Set(newSchedules.map(s => s.date))];
+      uniqueDates.forEach(d => this.syncDailyProductivity(d));
       this.notify('schedules:batch-added', newSchedules);
     }
 
@@ -647,8 +661,13 @@ class StateManager {
       if (cleanUpdates.deadline) cleanUpdates.deadline = normalizeDateString(cleanUpdates.deadline);
       if (cleanUpdates.title) cleanUpdates.title = String(cleanUpdates.title).trim();
       if (typeof cleanUpdates.description === 'string') cleanUpdates.description = cleanUpdates.description.trim();
+      const oldDate = this.schedules[idx].date;
       this.schedules[idx] = { ...this.schedules[idx], ...cleanUpdates };
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+      this.syncDailyProductivity(this.schedules[idx].date);
+      if (oldDate && oldDate !== this.schedules[idx].date) {
+        this.syncDailyProductivity(oldDate);
+      }
       this.notify('schedule:updated', this.schedules[idx]);
       return this.schedules[idx];
     }
@@ -676,9 +695,128 @@ class StateManager {
   }
 
   deleteSchedule(id) {
+    const item = this.schedules.find(s => s.id === id);
+    const itemDate = item ? item.date : null;
     this.schedules = this.schedules.filter(s => s.id !== id);
     this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+    if (itemDate) this.syncDailyProductivity(itemDate);
     this.notify('schedule:deleted', id);
+  }
+
+  // --- Daily Productivity & Midnight Settlement ---
+  syncDailyProductivity(targetDate = null) {
+    const dateToSync = targetDate ? normalizeDateString(targetDate) : getLocalDateString();
+    const daySchedules = this.getSchedules(dateToSync);
+    const total = daySchedules.length;
+    const completed = daySchedules.filter(s => s.completed).length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const todayStr = getLocalDateString();
+    const isPast = dateToSync < todayStr;
+
+    if (!Array.isArray(this.dailyLogs)) this.dailyLogs = [];
+
+    const existingIdx = this.dailyLogs.findIndex(l => l && l.date === dateToSync);
+    const logEntry = {
+      date: dateToSync,
+      totalScheduled: total,
+      completedCount: completed,
+      percentage,
+      isFinalized: isPast,
+      updatedAt: Date.now()
+    };
+
+    if (existingIdx >= 0) {
+      this.dailyLogs[existingIdx] = logEntry;
+    } else {
+      this.dailyLogs.push(logEntry);
+    }
+
+    // Sort descending by date (most recent first)
+    this.dailyLogs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    this._save(STORAGE_KEYS.DAILY_LOGS, this.dailyLogs);
+    this.notify('productivity:updated', logEntry);
+    return logEntry;
+  }
+
+  checkMidnightRollover() {
+    if (!Array.isArray(this.dailyLogs)) this.dailyLogs = [];
+    const todayStr = getLocalDateString();
+    let hasChanges = false;
+
+    // Finalize all logs from days prior to today
+    this.dailyLogs.forEach(log => {
+      if (log && log.date < todayStr && !log.isFinalized) {
+        log.isFinalized = true;
+        log.updatedAt = Date.now();
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      this._save(STORAGE_KEYS.DAILY_LOGS, this.dailyLogs);
+    }
+  }
+
+  getTodayProductivity() {
+    const todayStr = getLocalDateString();
+    const schedules = this.getSchedules(todayStr);
+    const total = schedules.length;
+    const completed = schedules.filter(s => s.completed).length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const isComplete = total > 0 && completed === total;
+
+    // Accurate calculation to 24:00 tonight
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    const diffMs = Math.max(0, midnight.getTime() - now.getTime());
+    const remainingHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const remainingMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const remainingTimeStr = `${remainingHours} jam ${remainingMinutes} mnt`;
+
+    return {
+      date: todayStr,
+      totalScheduled: total,
+      completedCount: completed,
+      percentage,
+      isComplete,
+      remainingTimeStr,
+      remainingHours,
+      remainingMinutes
+    };
+  }
+
+  getDailyLogs(limit = 14) {
+    if (!Array.isArray(this.dailyLogs)) return [];
+    return this.dailyLogs.slice(0, limit);
+  }
+
+  getProfileProductivityStats() {
+    if (!Array.isArray(this.dailyLogs)) this.dailyLogs = [];
+    const todayProd = this.getTodayProductivity();
+
+    const nonZeroLogs = this.dailyLogs.filter(l => l && l.totalScheduled > 0);
+    const perfectDays = nonZeroLogs.filter(l => l.percentage === 100).length;
+
+    // Consecutive streak of 100% days
+    let currentStreak = 0;
+    const sorted = [...nonZeroLogs].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    for (const log of sorted) {
+      if (log.percentage === 100) {
+        currentStreak++;
+      } else {
+        break;
+      }
+    }
+
+    return {
+      todayTotal: todayProd.totalScheduled,
+      todayCompleted: todayProd.completedCount,
+      todayPercent: todayProd.percentage,
+      isTodayComplete: todayProd.isComplete,
+      perfectDays,
+      currentStreak,
+      totalLoggedDays: nonZeroLogs.length
+    };
   }
 
   // --- Notes CRUD ---

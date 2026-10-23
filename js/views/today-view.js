@@ -6,7 +6,7 @@
 import { state, getLocalDateString, BANNER_PRESETS, getCustomBannerMedia, saveCustomBannerMedia, deleteCustomBannerMedia } from '../state.js';
 import { getIcon } from '../icons.js';
 import { notifications } from '../notifications.js';
-import { springBounce } from '../animations.js';
+import { springBounce, particleBurst } from '../animations.js';
 import { GeminiService } from '../gemini.js';
 
 export const todayViewMethods = {
@@ -18,6 +18,9 @@ export const todayViewMethods = {
 
     // Render Hero Banner (TikTok Trendy Aesthetic / Plain Fallback)
     this.renderTodayBanner(settings, schedules);
+
+    // Render Dynamic Schedule Progress Bar
+    this.renderTodayProgressBar();
 
     // Stats counter
     const completedCount = schedules.filter(s => s.completed).length;
@@ -633,20 +636,103 @@ export const todayViewMethods = {
     }
   },
 
+  renderTodayProgressBar() {
+    const widget = document.getElementById('today-schedule-progress-widget');
+    if (!widget) return;
+
+    const prod = state.getTodayProductivity();
+    const stats = state.getProfileProductivityStats();
+
+    const percentEl = document.getElementById('today-progress-percent');
+    const metaEl = document.getElementById('today-progress-meta');
+    const trackEl = document.getElementById('today-progress-track');
+    const fillEl = document.getElementById('today-progress-fill');
+    const countdownText = document.getElementById('today-countdown-text');
+    const statusText = document.getElementById('today-progress-status-text');
+    const streakText = document.getElementById('today-streak-text');
+
+    if (percentEl) percentEl.textContent = `${prod.percentage}%`;
+    if (metaEl) {
+      if (prod.totalScheduled === 0) {
+        metaEl.textContent = 'Belum ada agenda hari ini';
+      } else {
+        metaEl.textContent = `${prod.completedCount} dari ${prod.totalScheduled} kegiatan selesai`;
+      }
+    }
+
+    if (trackEl) {
+      trackEl.setAttribute('aria-valuenow', prod.percentage);
+      trackEl.setAttribute('aria-valuemax', 100);
+    }
+
+    if (fillEl) {
+      fillEl.style.width = `${prod.percentage}%`;
+      fillEl.classList.toggle('is-complete', prod.isComplete);
+    }
+
+    if (countdownText) {
+      if (prod.isComplete) {
+        countdownText.textContent = 'Tuntas 100% Hari Ini';
+      } else {
+        countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
+      }
+    }
+
+    if (statusText) {
+      if (prod.totalScheduled === 0) {
+        statusText.textContent = 'Tambahkan jadwal kegiatan untuk mengaktifkan target hari ini.';
+      } else if (prod.isComplete) {
+        statusText.textContent = 'Luar biasa! Seluruh agenda hari ini berhasil dituntaskan.';
+      } else {
+        const remaining = prod.totalScheduled - prod.completedCount;
+        statusText.textContent = `${remaining} kegiatan lagi untuk mencapai 100% tuntas sebelum pukul 24:00.`;
+      }
+    }
+
+    if (streakText) {
+      if (stats.perfectDays > 0) {
+        streakText.textContent = `${stats.perfectDays} Hari Tuntas`;
+      } else {
+        streakText.textContent = 'Target Hari Ini';
+      }
+    }
+
+    // Trigger celebratory particle burst when transitioning to 100%
+    if (prod.isComplete && !this._lastCelebratedComplete) {
+      this._lastCelebratedComplete = true;
+      try {
+        if (typeof particleBurst === 'function') {
+          particleBurst(widget);
+        }
+      } catch (e) {}
+    } else if (!prod.isComplete) {
+      this._lastCelebratedComplete = false;
+    }
+  },
+
   initRealtimeClock() {
     const updateClock = () => {
       const clockEl = document.getElementById('banner-live-clock');
-      if (!clockEl) return;
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, '0');
-      const m = String(now.getMinutes()).padStart(2, '0');
-      const s = String(now.getSeconds()).padStart(2, '0');
-      clockEl.textContent = `${h}:${m}:${s}`;
+      if (clockEl) {
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        const s = String(now.getSeconds()).padStart(2, '0');
+        clockEl.textContent = `${h}:${m}:${s}`;
+      }
     };
 
     updateClock();
     if (!this._realtimeClockInterval) {
-      this._realtimeClockInterval = setInterval(updateClock, 1000);
+      this._realtimeClockInterval = setInterval(() => {
+        updateClock();
+        // Update countdown text every minute
+        const countdownText = document.getElementById('today-countdown-text');
+        if (countdownText && !countdownText.textContent.includes('Tuntas 100%')) {
+          const prod = state.getTodayProductivity();
+          countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
+        }
+      }, 1000);
     }
   }
 };

@@ -323,6 +323,310 @@ export const aiPlanViewMethods = {
     return { cleanText, schedules };
   },
 
+  // --- Extract note items from Gemini Assistant Message ---
+  extractNotesFromAssistantMessage(rawText) {
+    if (!rawText || typeof rawText !== 'string') {
+      return { cleanText: '', note: null };
+    }
+
+    let cleanText = rawText;
+    let note = null;
+
+    const tagMatch = rawText.match(/\[DAYFLOW_NOTE\]([\s\S]*?)\[\/DAYFLOW_NOTE\]/i);
+    if (tagMatch) {
+      let block = tagMatch[1].trim();
+      block = block.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      // 1. Try standard JSON.parse
+      try {
+        const parsed = JSON.parse(block);
+        if (parsed && typeof parsed === 'object') {
+          note = {
+            title: String(parsed.title || parsed.judul || 'Catatan Baru').trim(),
+            content: String(parsed.content || parsed.isi || parsed.notes || '').trim()
+          };
+        }
+      } catch (err1) {
+        // 2. Resilient fallback: handles raw multiline newlines inside string values
+        try {
+          const titleMatch = block.match(/"(?:title|judul)"\s*:\s*"([^"]+)"/i);
+          const contentMatch = block.match(/"(?:content|isi|notes)"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"|\n\s*})/i) ||
+                               block.match(/"(?:content|isi|notes)"\s*:\s*"([\s\S]*?)"/i);
+          if (titleMatch || contentMatch) {
+            note = {
+              title: titleMatch ? titleMatch[1].trim() : 'Catatan Baru',
+              content: contentMatch ? contentMatch[1].trim() : ''
+            };
+          }
+        } catch (err2) {
+          console.warn('Failed parsing [DAYFLOW_NOTE] tag:', err2);
+        }
+      }
+
+      cleanText = rawText.replace(/\[DAYFLOW_NOTE\][\s\S]*?\[\/DAYFLOW_NOTE\]/gi, '').trim();
+    }
+
+    return { cleanText, note };
+  },
+
+  // --- Multimodal Attachment Handlers (Image, PDF, Text, CSV) ---
+  currentAttachment: null,
+
+  handleFileSelect(file) {
+    if (!file) return Promise.resolve(null);
+
+    const previewContainer = document.getElementById('chat-attachment-preview');
+    const previewImg = document.getElementById('attachment-preview-img');
+    const previewDoc = document.getElementById('attachment-preview-doc');
+    const fileNameEl = document.getElementById('attachment-file-name');
+    const fileSizeEl = document.getElementById('attachment-file-size');
+
+    const formatSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    return new Promise((resolve, reject) => {
+      try {
+        const isImage = file.type.startsWith('image/');
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        const isText = file.type.startsWith('text/') || /\.(txt|csv|md|json|ics)$/i.test(file.name);
+
+        if (!isImage && !isPdf && !isText) {
+          notifications.showToast('Format berkas tidak didukung. Harap pilih gambar (JPG/PNG), PDF, atau berkas teks/CSV.', 'warning');
+          return resolve(null);
+        }
+
+        if (isImage) {
+          // Prepare image with canvas auto-downscale if huge
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const rawDataUrl = e.target.result;
+            const img = new Image();
+            img.onload = () => {
+              let width = img.width;
+              let height = img.height;
+              const maxDim = 1600;
+              if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+
+              const canvas = document.createElement('canvas');
+              canvas.width = width;
+              canvas.height = height;
+              canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+              const compressedUrl = canvas.toDataURL('image/jpeg', 0.84);
+
+              // Micro thumbnail for lightweight localStorage history
+              const thumbCanvas = document.createElement('canvas');
+              const thumbMax = 180;
+              let tW = img.width;
+              let tH = img.height;
+              if (tW > tH && tW > thumbMax) {
+                tH = Math.round((tH * thumbMax) / tW);
+                tW = thumbMax;
+              } else if (tH > thumbMax) {
+                tW = Math.round((tW * thumbMax) / tH);
+                tH = thumbMax;
+              }
+              thumbCanvas.width = tW;
+              thumbCanvas.height = tH;
+              thumbCanvas.getContext('2d').drawImage(img, 0, 0, tW, tH);
+              const thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.6);
+
+              const b64 = compressedUrl.split(',')[1];
+              this.currentAttachment = {
+                name: file.name || 'foto.jpg',
+                type: 'image',
+                mimeType: 'image/jpeg',
+                size: file.size,
+                base64: b64,
+                thumbUrl: thumbUrl,
+                isImage: true,
+                isDoc: false
+              };
+
+              if (previewImg) {
+                previewImg.src = thumbUrl;
+                previewImg.classList.remove('hidden');
+              }
+              if (previewDoc) previewDoc.classList.add('hidden');
+              if (fileSizeEl) fileSizeEl.textContent = formatSize(file.size);
+              if (previewContainer) previewContainer.classList.remove('hidden');
+              notifications.showToast(`Gambar "${file.name}" terlampir. Siap dianalisis!`, 'info', 2500);
+              resolve(this.currentAttachment);
+            };
+            img.onerror = (err) => reject(err);
+            img.src = rawDataUrl;
+          };
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+
+        } else if (isPdf) {
+          if (file.size > 10 * 1024 * 1024) {
+            notifications.showToast('Ukuran berkas PDF maksimal 10MB.', 'warning');
+            return resolve(null);
+          }
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            const b64 = dataUrl.split(',')[1];
+            this.currentAttachment = {
+              name: file.name || 'dokumen.pdf',
+              type: 'pdf',
+              mimeType: 'application/pdf',
+              size: file.size,
+              base64: b64,
+              thumbUrl: '',
+              isImage: false,
+              isDoc: true
+            };
+
+            if (previewImg) previewImg.classList.add('hidden');
+            if (previewDoc) {
+              previewDoc.classList.remove('hidden');
+              if (fileNameEl) fileNameEl.textContent = file.name;
+            }
+            if (fileSizeEl) fileSizeEl.textContent = formatSize(file.size);
+            if (previewContainer) previewContainer.classList.remove('hidden');
+            notifications.showToast(`Dokumen PDF "${file.name}" terlampir.`, 'info', 2500);
+            resolve(this.currentAttachment);
+          };
+          reader.onerror = (err) => reject(err);
+          reader.readAsDataURL(file);
+
+        } else {
+          // Text / CSV / MD / JSON / ICS
+          if (file.size > 1024 * 1024) {
+            notifications.showToast('Ukuran berkas teks maksimal 1MB.', 'warning');
+            return resolve(null);
+          }
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const text = e.target.result;
+            this.currentAttachment = {
+              name: file.name || 'dokumen.txt',
+              type: 'text',
+              mimeType: file.type || 'text/plain',
+              size: file.size,
+              textContent: text,
+              base64: null,
+              thumbUrl: '',
+              isImage: false,
+              isDoc: true
+            };
+
+            if (previewImg) previewImg.classList.add('hidden');
+            if (previewDoc) {
+              previewDoc.classList.remove('hidden');
+              if (fileNameEl) fileNameEl.textContent = file.name;
+            }
+            if (fileSizeEl) fileSizeEl.textContent = formatSize(file.size);
+            if (previewContainer) previewContainer.classList.remove('hidden');
+            notifications.showToast(`Berkas "${file.name}" terlampir.`, 'info', 2500);
+            resolve(this.currentAttachment);
+          };
+          reader.onerror = (err) => reject(err);
+          reader.readAsText(file);
+        }
+      } catch (err) {
+        console.error('Error attaching file:', err);
+        notifications.showToast('Gagal memproses lampiran: ' + err.message, 'error');
+        resolve(null);
+      }
+    });
+  },
+
+  clearCurrentAttachment() {
+    this.currentAttachment = null;
+    const previewContainer = document.getElementById('chat-attachment-preview');
+    if (previewContainer) previewContainer.classList.add('hidden');
+    const fileInput = document.getElementById('chat-file-input');
+    if (fileInput) fileInput.value = '';
+  },
+
+  initChatAttachments() {
+    const attachBtn = document.getElementById('btn-chat-attach-file');
+    const fileInput = document.getElementById('chat-file-input');
+    const cancelBtn = document.getElementById('btn-cancel-attachment');
+    const chatInput = document.getElementById('chat-input');
+    const chatHistory = document.getElementById('chat-history');
+
+    if (attachBtn && fileInput && !attachBtn._hasAttachHandler) {
+      attachBtn._hasAttachHandler = true;
+      attachBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+          this.handleFileSelect(file);
+        }
+      });
+    }
+
+    if (cancelBtn && !cancelBtn._hasCancelHandler) {
+      cancelBtn._hasCancelHandler = true;
+      cancelBtn.addEventListener('click', () => {
+        this.clearCurrentAttachment();
+      });
+    }
+
+    // Clipboard Paste listener (Ctrl+V screenshot / image paste directly in chat)
+    if (chatInput && !chatInput._hasPasteHandler) {
+      chatInput._hasPasteHandler = true;
+      chatInput.addEventListener('paste', (e) => {
+        const clipboardItems = e.clipboardData && e.clipboardData.items;
+        if (!clipboardItems) return;
+
+        for (let i = 0; i < clipboardItems.length; i++) {
+          const item = clipboardItems[i];
+          if (item.type.indexOf('image') !== -1) {
+            const blob = item.getAsFile();
+            if (blob) {
+              e.preventDefault();
+              this.handleFileSelect(blob);
+              break;
+            }
+          }
+        }
+      });
+    }
+
+    // Drag and Drop listeners
+    const dropZones = [chatHistory, document.getElementById('chat-form')].filter(Boolean);
+    dropZones.forEach(zone => {
+      if (zone && !zone._hasDragHandler) {
+        zone._hasDragHandler = true;
+        zone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          zone.style.outline = '2px dashed var(--accent-primary)';
+          zone.style.outlineOffset = '-4px';
+        });
+        zone.addEventListener('dragleave', (e) => {
+          e.preventDefault();
+          zone.style.outline = 'none';
+        });
+        zone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          zone.style.outline = 'none';
+          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          if (file) {
+            this.handleFileSelect(file);
+          }
+        });
+      }
+    });
+  },
+
   setupChatDelegation(containerEl) {
     if (!containerEl || containerEl._hasChatDelegation) return;
     containerEl._hasChatDelegation = true;
@@ -357,6 +661,32 @@ export const aiPlanViewMethods = {
         return;
       }
 
+      // Handle save note card from chat
+      const saveNoteBtn = target.closest('[data-action="save-chat-note"]');
+      if (saveNoteBtn) {
+        e.stopPropagation();
+        const msgId = saveNoteBtn.getAttribute('data-msg-id');
+        const rawTitle = saveNoteBtn.getAttribute('data-note-title');
+        const rawContent = saveNoteBtn.getAttribute('data-note-content');
+        if (!rawTitle && !rawContent) return;
+
+        try {
+          const title = decodeURIComponent(rawTitle || 'Catatan AI');
+          const content = decodeURIComponent(rawContent || '');
+          state.addNote(title, content);
+          state.updateChatMessage(msgId, { savedNote: true });
+          particleBurst(saveNoteBtn, 'var(--status-success)');
+          springBounce(saveNoteBtn);
+          notifications.playChime();
+          notifications.showToast('Catatan berhasil disimpan ke Catatan & Memo!', 'success');
+          this.renderAiPlanView();
+        } catch (err) {
+          console.error('Error saving chat note:', err);
+          notifications.showToast('Gagal menyimpan catatan.', 'warning');
+        }
+        return;
+      }
+
       // Handle view in agenda
       const viewBtn = target.closest('[data-action="view-chat-date"]');
       if (viewBtn) {
@@ -372,6 +702,7 @@ export const aiPlanViewMethods = {
 
   // --- 3. AI Plan View ---
   renderAiPlanView() {
+    this.initChatAttachments();
     const chatHistoryEl = document.getElementById('chat-history');
     if (chatHistoryEl) {
       this.setupChatDelegation(chatHistoryEl);
@@ -379,9 +710,30 @@ export const aiPlanViewMethods = {
 
       chatHistoryEl.innerHTML = history.map((msg, idx) => {
         if (msg.role === 'user') {
+          let attachmentHtml = '';
+          if (msg.attachment) {
+            if (msg.attachment.isImage && msg.attachment.thumbUrl) {
+              attachmentHtml = `
+                <div class="chat-bubble-attachment">
+                  <img src="${msg.attachment.thumbUrl}" class="chat-attachment-img" alt="${escapeHtml(msg.attachment.name || 'Foto')}">
+                </div>
+              `;
+            } else if (msg.attachment.isDoc) {
+              attachmentHtml = `
+                <div class="chat-bubble-attachment">
+                  <div class="chat-attachment-pill">
+                    <span data-icon="file" data-icon-size="14"></span>
+                    <span>${escapeHtml(msg.attachment.name || 'Dokumen')}</span>
+                  </div>
+                </div>
+              `;
+            }
+          }
+
           return `
             <div class="chat-bubble chat-bubble-user">
-              <div class="chat-bubble-content">${formatMarkdown(msg.text)}</div>
+              ${attachmentHtml}
+              <div class="chat-bubble-content">${formatMarkdown(msg.text || '')}</div>
               <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
                 ${new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
               </div>
@@ -389,10 +741,11 @@ export const aiPlanViewMethods = {
           `;
         }
 
-        // Assistant Bubble: Extract clean conversational text + actionable schedule card
-        const { cleanText, schedules } = this.extractSchedulesFromAssistantMessage(msg.text);
-        let scheduleCardHtml = '';
+        // Assistant Bubble: Extract clean conversational text + actionable schedule card + actionable note card
+        const { cleanText: textAfterSchedule, schedules } = this.extractSchedulesFromAssistantMessage(msg.text);
+        const { cleanText: finalCleanText, note } = this.extractNotesFromAssistantMessage(textAfterSchedule);
 
+        let scheduleCardHtml = '';
         if (schedules.length > 0) {
           const targetDate = schedules[0].date || getLocalDateString();
           const displayDate = new Date(targetDate + 'T00:00:00').toLocaleDateString('id-ID', {
@@ -484,10 +837,51 @@ export const aiPlanViewMethods = {
           `;
         }
 
+        let noteCardHtml = '';
+        if (note) {
+          const encodedTitle = encodeURIComponent(note.title);
+          const encodedContent = encodeURIComponent(note.content);
+
+          let noteFooter = '';
+          if (msg.savedNote) {
+            noteFooter = `
+              <div class="chat-note-actions-row">
+                <span class="chat-note-saved-badge">
+                  ${getIcon('check', '', 12)} Tersimpan di Catatan
+                </span>
+              </div>
+            `;
+          } else {
+            noteFooter = `
+              <div class="chat-note-actions-row">
+                <button type="button" class="btn btn-primary btn-xs" data-action="save-chat-note" data-msg-id="${msg.id || ('msg_idx_' + idx)}" data-note-title="${encodedTitle}" data-note-content="${encodedContent}" style="font-size:11px; padding:4px 10px; cursor:pointer;">
+                  ${getIcon('file-text', '', 12)} Simpan sebagai Catatan
+                </button>
+              </div>
+            `;
+          }
+
+          noteCardHtml = `
+            <div class="chat-note-card">
+              <div class="chat-note-header">
+                <div class="chat-note-title-tag">
+                  <span data-icon="file-text" data-icon-size="13"></span>
+                  ${escapeHtml(note.title)}
+                </div>
+              </div>
+              <div class="chat-note-body">
+                ${formatMarkdown(note.content)}
+              </div>
+              ${noteFooter}
+            </div>
+          `;
+        }
+
         return `
           <div class="chat-bubble chat-bubble-assistant">
-            <div class="chat-bubble-content">${formatMarkdown(cleanText || msg.text)}</div>
+            <div class="chat-bubble-content">${formatMarkdown(finalCleanText || msg.text)}</div>
             ${scheduleCardHtml}
+            ${noteCardHtml}
             <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
               ${new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
             </div>
@@ -504,10 +898,30 @@ export const aiPlanViewMethods = {
     e.preventDefault();
     const input = document.getElementById('chat-input');
     const text = input ? input.value.trim() : '';
-    if (!text) return;
+    const activeAttachment = this.currentAttachment;
 
-    input.value = '';
-    state.addChatMessage('user', text);
+    if (!text && !activeAttachment) return;
+
+    if (input) input.value = '';
+
+    // Snapshot attachment for UI message history
+    let attachmentMeta = null;
+    if (activeAttachment) {
+      attachmentMeta = {
+        name: activeAttachment.name,
+        type: activeAttachment.type,
+        isImage: activeAttachment.isImage,
+        isDoc: activeAttachment.isDoc,
+        thumbUrl: activeAttachment.thumbUrl || ''
+      };
+    }
+
+    // Clear current attachment from form
+    this.clearCurrentAttachment();
+
+    state.addChatMessage('user', text || (activeAttachment ? `Lampiran: ${activeAttachment.name}` : ''), false, {
+      attachment: attachmentMeta
+    });
     this.renderAiPlanView();
 
     const submitBtn = document.getElementById('chat-submit-btn');
@@ -517,18 +931,22 @@ export const aiPlanViewMethods = {
     const shouldAutoSave = autoSaveToggle ? autoSaveToggle.checked : !!state.getSettings().chatAutoSave;
 
     try {
-      const reply = await GeminiService.sendChatMessage(text);
+      const reply = await GeminiService.sendChatMessage(text, activeAttachment);
       const { schedules } = this.extractSchedulesFromAssistantMessage(reply);
+      const { note } = this.extractNotesFromAssistantMessage(reply);
 
-      let isSaved = false;
+      let isScheduleSaved = false;
       if (shouldAutoSave && schedules && schedules.length > 0) {
         state.addSchedules(schedules);
-        isSaved = true;
+        isScheduleSaved = true;
         notifications.playChime();
         notifications.showToast(`${schedules.length} agenda otomatis dimasukkan ke jadwal!`, 'success');
       }
 
-      state.addChatMessage('assistant', reply, false, { savedSchedules: isSaved });
+      state.addChatMessage('assistant', reply, false, {
+        savedSchedules: isScheduleSaved,
+        savedNote: false
+      });
     } catch (err) {
       console.warn('AI chat error, attempting offline extraction fallback:', err);
       // Offline fallback: extract schedules directly from user text
@@ -564,6 +982,7 @@ export const aiPlanViewMethods = {
     });
 
     if (confirmed) {
+      this.clearCurrentAttachment();
       state.clearChatHistory();
       notifications.showToast('Riwayat percakapan telah dibersihkan.', 'info');
     }

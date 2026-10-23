@@ -83,7 +83,8 @@
     NOTES: "dayflow_notes_v1",
     SETTINGS: "dayflow_settings_v1",
     CHAT_HISTORY: "dayflow_chat_history_v1",
-    CATEGORIES: "dayflow_categories_v1"
+    CATEGORIES: "dayflow_categories_v1",
+    DAILY_LOGS: "dayflow_daily_logs_v1"
   };
   var DEFAULT_CATEGORIES = [
     { id: "cat_kerja", name: "Kerja", color: "#f97316", isDefault: true },
@@ -247,6 +248,7 @@
     soundEnabled: true,
     soundTone: "crystal",
     proactiveReminders: true,
+    systemNotificationsEnabled: true,
     theme: "dark",
     heroBannerEnabled: false,
     hasConfiguredBanner: false,
@@ -265,6 +267,7 @@
       this.schedules = this._load(STORAGE_KEYS.SCHEDULES, DEFAULT_SCHEDULES) || [];
       this.notes = this._load(STORAGE_KEYS.NOTES, DEFAULT_NOTES) || [];
       this.categories = this._load(STORAGE_KEYS.CATEGORIES, DEFAULT_CATEGORIES) || DEFAULT_CATEGORIES;
+      this.dailyLogs = this._load(STORAGE_KEYS.DAILY_LOGS, []) || [];
       const DUMMY_SCHEDULE_IDS = ["sch_1", "sch_2", "sch_3", "sch_4"];
       const DUMMY_SCHEDULE_TITLES = [
         "review rencana & prioritas harian",
@@ -361,6 +364,12 @@
         }
       } catch (e) {
         console.warn("Chat sanitization error:", e);
+      }
+      try {
+        this.checkMidnightRollover();
+        this.syncDailyProductivity();
+      } catch (e) {
+        console.warn("Productivity init error:", e);
       }
     }
     _load(key, fallback) {
@@ -502,6 +511,7 @@
       };
       this.schedules.push(newSchedule);
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+      this.syncDailyProductivity(safeDate);
       this.notify("schedule:added", newSchedule);
       return newSchedule;
     }
@@ -536,6 +546,8 @@
       if (newSchedules.length > 0) {
         this.schedules.push(...newSchedules);
         this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+        const uniqueDates = [...new Set(newSchedules.map((s) => s.date))];
+        uniqueDates.forEach((d) => this.syncDailyProductivity(d));
         this.notify("schedules:batch-added", newSchedules);
       }
       return newSchedules;
@@ -557,8 +569,13 @@
         if (cleanUpdates.deadline) cleanUpdates.deadline = normalizeDateString(cleanUpdates.deadline);
         if (cleanUpdates.title) cleanUpdates.title = String(cleanUpdates.title).trim();
         if (typeof cleanUpdates.description === "string") cleanUpdates.description = cleanUpdates.description.trim();
+        const oldDate = this.schedules[idx].date;
         this.schedules[idx] = { ...this.schedules[idx], ...cleanUpdates };
         this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+        this.syncDailyProductivity(this.schedules[idx].date);
+        if (oldDate && oldDate !== this.schedules[idx].date) {
+          this.syncDailyProductivity(oldDate);
+        }
         this.notify("schedule:updated", this.schedules[idx]);
         return this.schedules[idx];
       }
@@ -583,9 +600,108 @@
       }
     }
     deleteSchedule(id) {
+      const item = this.schedules.find((s) => s.id === id);
+      const itemDate = item ? item.date : null;
       this.schedules = this.schedules.filter((s) => s.id !== id);
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
+      if (itemDate) this.syncDailyProductivity(itemDate);
       this.notify("schedule:deleted", id);
+    }
+    // --- Daily Productivity & Midnight Settlement ---
+    syncDailyProductivity(targetDate = null) {
+      const dateToSync = targetDate ? normalizeDateString(targetDate) : getLocalDateString();
+      const daySchedules = this.getSchedules(dateToSync);
+      const total = daySchedules.length;
+      const completed = daySchedules.filter((s) => s.completed).length;
+      const percentage = total > 0 ? Math.round(completed / total * 100) : 0;
+      const todayStr = getLocalDateString();
+      const isPast = dateToSync < todayStr;
+      if (!Array.isArray(this.dailyLogs)) this.dailyLogs = [];
+      const existingIdx = this.dailyLogs.findIndex((l) => l && l.date === dateToSync);
+      const logEntry = {
+        date: dateToSync,
+        totalScheduled: total,
+        completedCount: completed,
+        percentage,
+        isFinalized: isPast,
+        updatedAt: Date.now()
+      };
+      if (existingIdx >= 0) {
+        this.dailyLogs[existingIdx] = logEntry;
+      } else {
+        this.dailyLogs.push(logEntry);
+      }
+      this.dailyLogs.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      this._save(STORAGE_KEYS.DAILY_LOGS, this.dailyLogs);
+      this.notify("productivity:updated", logEntry);
+      return logEntry;
+    }
+    checkMidnightRollover() {
+      if (!Array.isArray(this.dailyLogs)) this.dailyLogs = [];
+      const todayStr = getLocalDateString();
+      let hasChanges = false;
+      this.dailyLogs.forEach((log) => {
+        if (log && log.date < todayStr && !log.isFinalized) {
+          log.isFinalized = true;
+          log.updatedAt = Date.now();
+          hasChanges = true;
+        }
+      });
+      if (hasChanges) {
+        this._save(STORAGE_KEYS.DAILY_LOGS, this.dailyLogs);
+      }
+    }
+    getTodayProductivity() {
+      const todayStr = getLocalDateString();
+      const schedules = this.getSchedules(todayStr);
+      const total = schedules.length;
+      const completed = schedules.filter((s) => s.completed).length;
+      const percentage = total > 0 ? Math.round(completed / total * 100) : 0;
+      const isComplete = total > 0 && completed === total;
+      const now = /* @__PURE__ */ new Date();
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+      const diffMs = Math.max(0, midnight.getTime() - now.getTime());
+      const remainingHours = Math.floor(diffMs / (1e3 * 60 * 60));
+      const remainingMinutes = Math.floor(diffMs % (1e3 * 60 * 60) / (1e3 * 60));
+      const remainingTimeStr = `${remainingHours} jam ${remainingMinutes} mnt`;
+      return {
+        date: todayStr,
+        totalScheduled: total,
+        completedCount: completed,
+        percentage,
+        isComplete,
+        remainingTimeStr,
+        remainingHours,
+        remainingMinutes
+      };
+    }
+    getDailyLogs(limit = 14) {
+      if (!Array.isArray(this.dailyLogs)) return [];
+      return this.dailyLogs.slice(0, limit);
+    }
+    getProfileProductivityStats() {
+      if (!Array.isArray(this.dailyLogs)) this.dailyLogs = [];
+      const todayProd = this.getTodayProductivity();
+      const nonZeroLogs = this.dailyLogs.filter((l) => l && l.totalScheduled > 0);
+      const perfectDays = nonZeroLogs.filter((l) => l.percentage === 100).length;
+      let currentStreak = 0;
+      const sorted = [...nonZeroLogs].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+      for (const log of sorted) {
+        if (log.percentage === 100) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+      return {
+        todayTotal: todayProd.totalScheduled,
+        todayCompleted: todayProd.completedCount,
+        todayPercent: todayProd.percentage,
+        isTodayComplete: todayProd.isComplete,
+        perfectDays,
+        currentStreak,
+        totalLoggedDays: nonZeroLogs.length
+      };
     }
     // --- Notes CRUD ---
     getNotes() {
@@ -785,20 +901,25 @@
     layers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
     share: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>`,
     "external-link": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>`,
-    repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`
+    repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`,
+    paperclip: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
+    file: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`,
+    flame: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`
   };
   function getIcon(name, extraClass = "", size = 18) {
     const svg = icons[name] || icons.circle;
     return svg.replace("<svg ", `<svg class="df-icon ${extraClass}" width="${size}" height="${size}" aria-hidden="true" `);
   }
   function renderIcons(root = document, force = false) {
-    const selector = force ? "[data-icon]" : '[data-icon]:not([data-icon-rendered="true"])';
-    root.querySelectorAll(selector).forEach((el) => {
+    root.querySelectorAll("[data-icon]").forEach((el) => {
       const name = el.getAttribute("data-icon");
+      const rendered = el.getAttribute("data-rendered-icon");
+      if (!force && rendered === name && el.children.length > 0) return;
       const size = parseInt(el.getAttribute("data-icon-size") || "18", 10);
       const extraClass = el.getAttribute("data-icon-class") || "";
       el.innerHTML = getIcon(name, extraClass, size);
       el.setAttribute("data-icon-rendered", "true");
+      el.setAttribute("data-rendered-icon", name);
     });
   }
 
@@ -808,9 +929,25 @@
       this.audioCtx = null;
       this.notifiedSet = /* @__PURE__ */ new Set();
       this.pollInterval = null;
+      this._fallbackAudioCache = {};
+      this._visibilityBound = false;
+      this._stateSubscribed = false;
     }
     init() {
       this._startScheduler();
+      this._bindStateSubscription();
+    }
+    _bindStateSubscription() {
+      if (this._stateSubscribed) return;
+      this._stateSubscribed = true;
+      try {
+        state.subscribe((event) => {
+          if (event === "schedule:added" || event === "schedule:updated" || event === "schedules:reset") {
+            this._checkUpcomingSchedules();
+          }
+        });
+      } catch (e) {
+      }
     }
     unlockAudio() {
       try {
@@ -818,29 +955,106 @@
         if (!this.audioCtx && AudioContextClass) {
           this.audioCtx = new AudioContextClass();
         }
-        if (this.audioCtx && this.audioCtx.state === "suspended") {
-          this.audioCtx.resume();
+        if (this.audioCtx) {
+          if (this.audioCtx.state === "suspended") {
+            this.audioCtx.resume().catch(() => {
+            });
+          }
+          const buffer = this.audioCtx.createBuffer(1, 1, 22050);
+          const source = this.audioCtx.createBufferSource();
+          source.buffer = buffer;
+          source.connect(this.audioCtx.destination);
+          source.start(0);
         }
       } catch (e) {
         console.warn("Audio unlock warning:", e);
       }
     }
-    // Synthesize crystal-clear, loud, harmonic acoustic bell chime via Web Audio API
+    _generateWavDataUri(tone) {
+      function writeStr(view2, offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view2.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+      const sampleRate = 22050;
+      const duration = tone === "digital" ? 0.35 : tone === "marimba" ? 0.55 : 0.75;
+      const numSamples = Math.floor(sampleRate * duration);
+      const buffer = new ArrayBuffer(44 + numSamples * 2);
+      const view = new DataView(buffer);
+      writeStr(view, 0, "RIFF");
+      view.setUint32(4, 36 + numSamples * 2, true);
+      writeStr(view, 8, "WAVE");
+      writeStr(view, 12, "fmt ");
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(view, 36, "data");
+      view.setUint32(40, numSamples * 2, true);
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        let sample = 0;
+        if (tone === "marimba") {
+          const env = Math.exp(-6.5 * t);
+          sample = (Math.sin(2 * Math.PI * 659.25 * t) + 0.6 * Math.sin(2 * Math.PI * 830.61 * t) + 0.35 * Math.sin(2 * Math.PI * 987.77 * t)) * env;
+        } else if (tone === "digital") {
+          const env = Math.exp(-8.5 * t);
+          sample = (Math.sin(2 * Math.PI * 1046.5 * t) + 0.7 * Math.sin(2 * Math.PI * 1567.98 * t)) * env;
+        } else {
+          const env = Math.exp(-4.5 * t);
+          sample = (Math.sin(2 * Math.PI * 783.99 * t) + 0.65 * Math.sin(2 * Math.PI * 1046.5 * t) + 0.45 * Math.sin(2 * Math.PI * 1318.51 * t)) * env;
+        }
+        const s = Math.max(-1, Math.min(1, sample * 0.8));
+        view.setInt16(44 + i * 2, s < 0 ? s * 32768 : s * 32767, true);
+      }
+      const blob = new Blob([buffer], { type: "audio/wav" });
+      return URL.createObjectURL(blob);
+    }
+    _playAudioFallback(tone) {
+      try {
+        if (!this._fallbackAudioCache[tone]) {
+          this._fallbackAudioCache[tone] = this._generateWavDataUri(tone);
+        }
+        const audio = new Audio(this._fallbackAudioCache[tone]);
+        audio.volume = 0.95;
+        audio.play().catch((e) => {
+          console.warn("Audio fallback element play prevented:", e);
+        });
+      } catch (e) {
+        console.warn("Audio fallback error:", e);
+      }
+    }
+    // Synthesize crystal-clear, loud, harmonic acoustic bell chime via Web Audio API + HTML Audio fallback
     async playChime(overrideTone = null) {
       const settings = state.getSettings();
-      if (!settings.soundEnabled) return;
+      if (settings.soundEnabled === false) return;
       const tone = overrideTone || settings.soundTone || "crystal";
       try {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return;
+        if (!AudioContextClass) {
+          this._playAudioFallback(tone);
+          return;
+        }
         if (!this.audioCtx) {
           this.audioCtx = new AudioContextClass();
         }
         if (this.audioCtx.state === "suspended") {
-          await this.audioCtx.resume();
+          this.audioCtx.resume().catch(() => {
+          });
+          await Promise.race([
+            this.audioCtx.resume().catch(() => {
+            }),
+            new Promise((r) => setTimeout(r, 60))
+          ]);
+        }
+        if (this.audioCtx.state === "suspended") {
+          this._playAudioFallback(tone);
         }
         const ctx = this.audioCtx;
-        const now = ctx.currentTime;
+        const now = Math.max(0, ctx.currentTime);
         const compressor = ctx.createDynamicsCompressor();
         compressor.threshold.setValueAtTime(-14, now);
         compressor.knee.setValueAtTime(8, now);
@@ -852,39 +1066,40 @@
         compressor.connect(masterGain);
         masterGain.connect(ctx.destination);
         const playTone = (freq, startTime, duration = 0.85, gainLevel = 0.7, waveType = "triangle") => {
+          const actualStart = Math.max(ctx.currentTime + 5e-3, startTime);
           const osc1 = ctx.createOscillator();
           const gain1 = ctx.createGain();
           osc1.type = waveType;
-          osc1.frequency.setValueAtTime(freq, startTime);
-          gain1.gain.setValueAtTime(0, startTime);
-          gain1.gain.linearRampToValueAtTime(gainLevel, startTime + 0.012);
-          gain1.gain.exponentialRampToValueAtTime(1e-4, startTime + duration);
+          osc1.frequency.setValueAtTime(freq, actualStart);
+          gain1.gain.setValueAtTime(0, actualStart);
+          gain1.gain.linearRampToValueAtTime(gainLevel, actualStart + 0.012);
+          gain1.gain.exponentialRampToValueAtTime(1e-4, actualStart + duration);
           osc1.connect(gain1);
           gain1.connect(compressor);
-          osc1.start(startTime);
-          osc1.stop(startTime + duration);
+          osc1.start(actualStart);
+          osc1.stop(actualStart + duration);
           const osc2 = ctx.createOscillator();
           const gain2 = ctx.createGain();
           osc2.type = "sine";
-          osc2.frequency.setValueAtTime(freq * 2.008, startTime);
-          gain2.gain.setValueAtTime(0, startTime);
-          gain2.gain.linearRampToValueAtTime(gainLevel * 0.45, startTime + 0.01);
-          gain2.gain.exponentialRampToValueAtTime(1e-4, startTime + duration * 0.7);
+          osc2.frequency.setValueAtTime(freq * 2.008, actualStart);
+          gain2.gain.setValueAtTime(0, actualStart);
+          gain2.gain.linearRampToValueAtTime(gainLevel * 0.45, actualStart + 0.01);
+          gain2.gain.exponentialRampToValueAtTime(1e-4, actualStart + duration * 0.7);
           osc2.connect(gain2);
           gain2.connect(compressor);
-          osc2.start(startTime);
-          osc2.stop(startTime + duration * 0.7);
+          osc2.start(actualStart);
+          osc2.stop(actualStart + duration * 0.7);
           const osc3 = ctx.createOscillator();
           const gain3 = ctx.createGain();
           osc3.type = "sine";
-          osc3.frequency.setValueAtTime(freq * 3.015, startTime);
-          gain3.gain.setValueAtTime(0, startTime);
-          gain3.gain.linearRampToValueAtTime(gainLevel * 0.25, startTime + 8e-3);
-          gain3.gain.exponentialRampToValueAtTime(1e-4, startTime + 0.3);
+          osc3.frequency.setValueAtTime(freq * 3.015, actualStart);
+          gain3.gain.setValueAtTime(0, actualStart);
+          gain3.gain.linearRampToValueAtTime(gainLevel * 0.25, actualStart + 8e-3);
+          gain3.gain.exponentialRampToValueAtTime(1e-4, actualStart + 0.3);
           osc3.connect(gain3);
           gain3.connect(compressor);
-          osc3.start(startTime);
-          osc3.stop(startTime + 0.3);
+          osc3.start(actualStart);
+          osc3.stop(actualStart + 0.3);
         };
         if (tone === "marimba") {
           playTone(659.25, now + 0, 0.45, 0.8, "sine");
@@ -899,30 +1114,143 @@
           playTone(1318.51, now + 0.26, 1.35, 0.9, "triangle");
         }
       } catch (e) {
-        console.warn("Audio chime playback error:", e);
+        console.warn("Audio chime playback error, fallback to HTML Audio:", e);
+        this._playAudioFallback(tone);
       }
+    }
+    getPermissionStatus() {
+      if (!("Notification" in window)) return "unsupported";
+      return Notification.permission;
     }
     async requestPermission() {
       if (!("Notification" in window)) {
         this.showToast("Browser ini tidak mendukung Web Notifications.", "warning");
-        return false;
+        return "unsupported";
       }
       if (Notification.permission === "granted") {
-        this.showToast("Izin notifikasi sudah aktif.", "success");
-        return true;
+        return "granted";
+      }
+      if (Notification.permission === "denied") {
+        this.showToast("Izin notifikasi diblokir browser. Klik ikon gembok pada URL untuk mengizinkan.", "warning", 7e3);
+        return "denied";
       }
       try {
         const result = await Notification.requestPermission();
         if (result === "granted") {
-          this.showToast("Izin notifikasi berhasil diaktifkan.", "success");
+          this.showToast("Izin notifikasi berhasil diaktifkan!", "success");
           this.playChime();
-          return true;
+          this.sendSystemNotification("DayFlow \u2022 Notifikasi Aktif", {
+            body: "\u{1F514} Notifikasi pengingat agenda DayFlow siap muncul di layarmu.",
+            tag: "dayflow_perm_granted"
+          });
+          state.notify("notifications:permission-changed", "granted");
+          return "granted";
         } else {
-          this.showToast("Izin notifikasi ditolak oleh pengguna.", "warning");
-          return false;
+          this.showToast("Izin notifikasi belum diberikan. Kamu bisa mengaktifkannya kapan saja di Pengaturan.", "warning", 5e3);
+          state.notify("notifications:permission-changed", result);
+          return result;
         }
       } catch (e) {
         console.error("Error requesting notification permission:", e);
+        return "error";
+      }
+    }
+    async sendSystemNotification(title, options = {}) {
+      const settings = state.getSettings();
+      if (settings.systemNotificationsEnabled === false) {
+        return { ok: false, reason: "disabled_in_settings" };
+      }
+      if (!("Notification" in window)) {
+        return { ok: false, reason: "unsupported" };
+      }
+      if (Notification.permission !== "granted") {
+        return { ok: false, reason: "permission_not_granted", permission: Notification.permission };
+      }
+      if ("vibrate" in navigator) {
+        try {
+          navigator.vibrate([200, 100, 200, 100, 250]);
+        } catch (e) {
+        }
+      }
+      const defaultOptions = {
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        vibrate: [200, 100, 200, 100, 250],
+        requireInteraction: false,
+        silent: false
+      };
+      const finalOptions = { ...defaultOptions, ...options };
+      let delivered = false;
+      if ("serviceWorker" in navigator) {
+        try {
+          const reg = await Promise.race([
+            navigator.serviceWorker.getRegistration(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 400))
+          ]);
+          if (reg && reg.active && typeof reg.showNotification === "function") {
+            await reg.showNotification(title, finalOptions);
+            delivered = true;
+          }
+        } catch (e) {
+          console.warn("SW notification fallback to Window Notification:", e);
+        }
+      }
+      if (!delivered) {
+        try {
+          const notif = new Notification(title, finalOptions);
+          notif.onclick = () => {
+            try {
+              window.focus();
+              notif.close();
+            } catch (e) {
+            }
+          };
+          delivered = true;
+        } catch (err) {
+          console.warn("Direct notification spawn warning:", err);
+        }
+      }
+      return { ok: delivered };
+    }
+    async testNotification(overrideTone = null) {
+      const settings = state.getSettings();
+      const tone = overrideTone || settings.soundTone || "crystal";
+      const toneNames = {
+        crystal: "Crystal Bell",
+        marimba: "Marimba",
+        digital: "Digital Pulse"
+      };
+      const toneName = toneNames[tone] || "Crystal Bell";
+      this.playChime(tone);
+      if ("vibrate" in navigator) {
+        try {
+          navigator.vibrate([200, 100, 200]);
+        } catch (e) {
+        }
+      }
+      this.showToast(`\u{1F514} Uji Notifikasi: Bel ${toneName} berbunyi.`, "info", 4500);
+      if (!("Notification" in window)) {
+        this.showToast("Browser ini tidak mendukung Web Notifications di desktop/layar.", "warning");
+        return false;
+      }
+      if (Notification.permission === "default") {
+        const result = await this.requestPermission();
+        return result === "granted";
+      }
+      if (Notification.permission === "denied") {
+        this.showToast("Notifikasi sistem diblokir browser. Buka info situs (ikon gembok) di bilah URL lalu ubah Notifikasi menjadi Izinkan.", "warning", 7e3);
+        return false;
+      }
+      const res = await this.sendSystemNotification("DayFlow \u2022 Notifikasi Berfungsi Normal!", {
+        body: `\u{1F514} Pengingat jadwal dan bunyi bel ${toneName} aktif. Siap mengingatkan agenda harianmu!`,
+        tag: "dayflow_test_notification",
+        renotify: true
+      });
+      if (res.ok) {
+        this.showToast("Notifikasi sistem berhasil dimunculkan ke layar!", "success", 4e3);
+        return true;
+      } else {
+        this.showToast("Notifikasi terkirim. Jika tidak muncul, periksa Focus Assist / DND di Windows/HP Anda.", "warning", 6e3);
         return false;
       }
     }
@@ -1001,35 +1329,14 @@
         if (diffMins <= advanceMinutes && diffMins > -5 && !this.notifiedSet.has(notifyKey)) {
           this.notifiedSet.add(notifyKey);
           const timeLabel = diffMins <= 0 ? "Sedang berlangsung" : `Dalam ${diffMins} menit lagi`;
-          const alertMsg = `${schedule.title} (${schedule.time}) - ${timeLabel}`;
+          const alertMsg = `${schedule.title} (${schedule.time}) \u2014 ${timeLabel}`;
           this.playChime();
           this.showToast(alertMsg, "warning", 6e3);
-          if ("Notification" in window && Notification.permission === "granted") {
-            const notifOptions = {
-              body: alertMsg,
-              icon: "/icons/icon-192.png",
-              badge: "/icons/icon-192.png",
-              tag: schedule.id,
-              renotify: true
-            };
-            if ("serviceWorker" in navigator && navigator.serviceWorker.ready) {
-              navigator.serviceWorker.ready.then((reg) => {
-                return reg.showNotification("DayFlow Pengingat Jadwal", notifOptions);
-              }).catch(() => {
-                try {
-                  new Notification("DayFlow Pengingat Jadwal", notifOptions);
-                } catch (err) {
-                  console.warn("Notification constructor fallback warning:", err);
-                }
-              });
-            } else {
-              try {
-                new Notification("DayFlow Pengingat Jadwal", notifOptions);
-              } catch (err) {
-                console.warn("Native notification spawn warning:", err);
-              }
-            }
-          }
+          this.sendSystemNotification("DayFlow Pengingat Jadwal", {
+            body: alertMsg,
+            tag: schedule.id,
+            renotify: true
+          });
         }
       });
     }
@@ -1118,30 +1425,11 @@
       });
       this.playChime();
       this.showToast(`AI: ${slotTitle} baru tersedia!`, "info", 5e3);
-      if ("Notification" in window && Notification.permission === "granted") {
-        const notifOptions = {
-          body: message,
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-          tag: `proactive_${currentSlot}_${todayStr}`,
-          renotify: true
-        };
-        if ("serviceWorker" in navigator && navigator.serviceWorker.ready) {
-          navigator.serviceWorker.ready.then((reg) => {
-            return reg.showNotification(`DayFlow AI \u2022 ${slotTitle}`, notifOptions);
-          }).catch(() => {
-            try {
-              new Notification(`DayFlow AI \u2022 ${slotTitle}`, notifOptions);
-            } catch (e) {
-            }
-          });
-        } else {
-          try {
-            new Notification(`DayFlow AI \u2022 ${slotTitle}`, notifOptions);
-          } catch (e) {
-          }
-        }
-      }
+      this.sendSystemNotification(`DayFlow AI \u2022 ${slotTitle}`, {
+        body: message,
+        tag: `proactive_${currentSlot}_${todayStr}`,
+        renotify: true
+      });
       state.notify("ai:proactive-reminder", nudgeData);
     }
     getActiveProactiveNudge() {
@@ -1514,7 +1802,7 @@ ${message}`));
     // Default Gemini Intelligence Model (Token-efficient & broad answers)
     DEFAULT_MODEL: "gemini-2.5-flash",
     // Version identifier
-    VERSION: "6.2.0"
+    VERSION: "6.3.0"
   };
   if (typeof window !== "undefined") {
     const localProxy = localStorage.getItem("dayflow_proxy_url");
@@ -1574,6 +1862,26 @@ Aturan penting tag [DAYFLOW_SCHEDULES]:
 - Jika item berupa tugas bertenggat (deadline/pengumpulan/submit), isi "deadline" ("YYYY-MM-DD") dan set "priority": "high".
 - Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
 - JANGAN PERNAH menambahkan kegiatan fiktif/pengisi (seperti istirahat/persiapan) yang tidak diminta!
+
+10. AKSI PEMBUATAN CATATAN OTOMATIS (ACTIONABLE NOTE EXECUTION):
+Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi/foto papan tulis/notula rapat yang cocok disimpan sebagai catatan:
+- Sertakan blok JSON catatan terstruktur di dalam tag:
+[DAYFLOW_NOTE]
+{
+  "title": "Judul Catatan Ringkas (3-6 kata)",
+  "content": "Isi rangkuman catatan lengkap dalam format markdown bersih (gunakan bullet points, ringkasan, atau action items)..."
+}
+[/DAYFLOW_NOTE]
+
+11. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
+Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah, silabus, foto papan tulis/catatan, poster event, atau screenshot kalender) atau berkas dokumen (PDF, TXT, CSV, ICS):
+- Teliti dan analisis seluruh teks dan informasi visual yang tertera di dalamnya secara cermat.
+- JIKA BERISI JADWAL/ACARA/DEADLINE:
+  * Jelaskan ringkasan agenda yang ditemukan secara lugas dan ramah.
+  * WAJIB sertakan tag [DAYFLOW_SCHEDULES] berisi semua kegiatan yang valid agar pengguna bisa langsung menyimpannya ke agenda dalam 1 klik.
+- JIKA BERISI RINGKASAN MATERI/NOTULA/CATATAN TUGAS:
+  * Berikan penjelasan penting.
+  * WAJIB sertakan tag [DAYFLOW_NOTE] agar pengguna bisa langsung menyimpannya ke Catatan DayFlow dalam 1 klik.
 `;
   var GeminiService = class {
     static getApiKey() {
@@ -1691,46 +1999,84 @@ Aturan penting tag [DAYFLOW_SCHEDULES]:
       throw lastError || new Error("Gagal memproses permintaan AI.");
     }
     /**
-     * General Chat with Gemini
+     * General Chat with Gemini (Supports Multimodal Image & Document Attachments)
      */
-    static async sendChatMessage(userText) {
+    static async sendChatMessage(userText, attachment = null) {
       const systemPrompt = this.buildSystemPrompt();
-      const rawHistory = state.getChatHistory().slice(-10);
-      const mapped = [];
+      const allHistory = state.getChatHistory();
+      let historyToUse = allHistory;
+      let currentTurnText = typeof userText === "string" ? userText.trim() : "";
+      if (allHistory.length > 0 && allHistory[allHistory.length - 1].role === "user") {
+        const lastMsg = allHistory[allHistory.length - 1];
+        historyToUse = allHistory.slice(0, -1);
+        if (!currentTurnText) {
+          currentTurnText = lastMsg.text;
+        }
+      }
+      if (attachment && attachment.textContent) {
+        const docHeader = `[DOKUMEN TERLAMPIR: ${attachment.name || "Dokumen"}]
+${attachment.textContent}
+[/DOKUMEN TERLAMPIR]
+
+`;
+        currentTurnText = `${docHeader}${currentTurnText || "Tolong analisis isi dokumen ini dan bantu susunkan jadwal kegiatan atau catatan pentingnya."}`;
+      }
+      if ((!currentTurnText || currentTurnText.startsWith("Lampiran:")) && attachment && attachment.base64) {
+        currentTurnText = "Tolong analisis gambar/dokumen terlampir ini secara menyeluruh, jelaskan informasi jadwal/catatan penting yang tertera, dan buatkan jadwal kegiatan dalam tag [DAYFLOW_SCHEDULES] bila relevan.";
+      }
+      if (!currentTurnText) {
+        currentTurnText = "Halo";
+      }
+      const rawHistory = historyToUse.slice(-10);
+      const normalizedTurns = [];
       rawHistory.forEach((msg) => {
         if (!msg) return;
         const text = typeof msg.text === "string" ? msg.text.trim() : "";
         if (!text) return;
         const role = msg.role === "assistant" || msg.role === "model" ? "model" : "user";
-        mapped.push({ role, text });
-      });
-      const lastMapped = mapped[mapped.length - 1];
-      if (!lastMapped || lastMapped.role !== "user" || lastMapped.text !== userText.trim()) {
-        mapped.push({ role: "user", text: userText.trim() });
-      }
-      const normalizedTurns = [];
-      for (const item of mapped) {
-        if (normalizedTurns.length > 0 && normalizedTurns[normalizedTurns.length - 1].role === item.role) {
+        if (normalizedTurns.length > 0 && normalizedTurns[normalizedTurns.length - 1].role === role) {
           normalizedTurns[normalizedTurns.length - 1].parts[0].text += `
 
-${item.text}`;
+${text}`;
         } else {
           normalizedTurns.push({
-            role: item.role,
-            parts: [{ text: item.text }]
+            role,
+            parts: [{ text }]
           });
         }
-      }
+      });
       if (normalizedTurns.length > 0 && normalizedTurns[0].role === "model") {
         normalizedTurns.unshift({
           role: "user",
           parts: [{ text: "Halo DayFlow, tolong bantu aku menata jadwal dan rencanaku." }]
         });
       }
-      if (normalizedTurns.length === 0) {
+      const activeParts = [];
+      if (attachment && attachment.base64 && attachment.mimeType) {
+        activeParts.push({
+          inlineData: {
+            mimeType: attachment.mimeType,
+            data: attachment.base64
+          }
+        });
+      }
+      activeParts.push({ text: currentTurnText });
+      if (normalizedTurns.length > 0 && normalizedTurns[normalizedTurns.length - 1].role === "user") {
+        if (attachment && attachment.base64 && attachment.mimeType) {
+          normalizedTurns[normalizedTurns.length - 1].parts.unshift({
+            inlineData: {
+              mimeType: attachment.mimeType,
+              data: attachment.base64
+            }
+          });
+        }
+        normalizedTurns[normalizedTurns.length - 1].parts[normalizedTurns[normalizedTurns.length - 1].parts.length - 1].text += `
+
+${currentTurnText}`;
+      } else {
         normalizedTurns.push({
           role: "user",
-          parts: [{ text: userText.trim() || "Halo" }]
+          parts: activeParts
         });
       }
       const payload = {
@@ -1962,9 +2308,456 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
     }
   };
 
+  // js/components/modal-templates.js
+  var MODALS_HTML = `
+    <!-- Modal: Tambah/Edit Jadwal (Bottom-sheet) -->
+    <div id="modal-schedule" class="modal-overlay" role="dialog" aria-modal="true">
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3 class="sheet-title" id="modal-schedule-title">Tambah Jadwal Baru</h3>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup">
+            <span data-icon="x" data-icon-size="18"></span>
+          </button>
+        </div>
+
+        <form id="schedule-form" class="modal-form-clean">
+          <!-- 1. Nama Kegiatan -->
+          <div class="form-group">
+            <label class="form-label" for="sch-input-title">Nama Kegiatan</label>
+            <input type="text" id="sch-input-title" class="input-control" placeholder="Tuliskan nama kegiatan..." required>
+          </div>
+
+          <!-- Deskripsi Singkat (Opsional) -->
+          <div class="form-group">
+            <label class="form-label" for="sch-input-description">Deskripsi Singkat (Opsional)</label>
+            <input type="text" id="sch-input-description" class="input-control" placeholder="Contoh: Gedung Saintek 3S.1, bab 2, link zoom..." maxlength="120">
+          </div>
+
+          <!-- 2. Tanggal & Waktu Mulai (Grid 2 Kolom) -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="form-group">
+              <label class="form-label" for="sch-input-date">Tanggal</label>
+              <input type="date" id="sch-input-date" class="input-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sch-input-time">Waktu Mulai</label>
+              <input type="time" id="sch-input-time" class="input-control" required>
+            </div>
+          </div>
+
+          <!-- 3. Durasi Kegiatan (Segmented Pill Strip) -->
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label class="form-label" style="margin-bottom:0;">Durasi Kegiatan</label>
+              <span class="text-orange tabular-nums" style="font-size:12px; font-weight:600;" id="sch-duration-label">30 menit</span>
+            </div>
+            <div class="quick-duration-pills" id="duration-quick-selector">
+              <button type="button" class="duration-pill" data-min="15">15m</button>
+              <button type="button" class="duration-pill active" data-min="30">30m</button>
+              <button type="button" class="duration-pill" data-min="45">45m</button>
+              <button type="button" class="duration-pill" data-min="60">60m</button>
+              <button type="button" class="duration-pill" data-min="90">90m</button>
+            </div>
+            <input type="hidden" id="sch-input-duration" value="30">
+          </div>
+
+          <!-- 4. Pengaturan Lanjutan (Progressive Disclosure) -->
+          <details id="sch-advanced-options" class="advanced-options-details">
+            <summary class="advanced-options-summary">
+              <span style="display:inline-flex; align-items:center; gap:8px;">
+                <span data-icon="sliders" data-icon-size="14"></span>
+                <span>Pengaturan Tambahan (Kategori, Pengulangan, Prioritas)</span>
+              </span>
+              <span class="advanced-summary-chevron" data-icon="chevron-down" data-icon-size="14"></span>
+            </summary>
+            <div class="advanced-options-body">
+              <!-- Kategori Agenda -->
+              <div class="form-group">
+                <label class="form-label" style="margin-bottom:6px;">Kategori</label>
+                <div class="category-radio-grid" id="sch-category-radio-group">
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Kerja" checked>
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-kerja"></span>
+                      Kerja
+                    </span>
+                  </label>
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Fokus">
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-fokus"></span>
+                      Fokus
+                    </span>
+                  </label>
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Pribadi">
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-pribadi"></span>
+                      Pribadi
+                    </span>
+                  </label>
+                  <label class="category-radio-item">
+                    <input type="radio" name="sch-category-radio" value="Kesehatan">
+                    <span class="category-radio-badge">
+                      <span class="category-indicator dot-kesehatan"></span>
+                      Kesehatan
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Tingkat Prioritas -->
+              <div class="form-group">
+                <label class="form-label" style="margin-bottom:6px;">Prioritas</label>
+                <div class="priority-radio-grid" id="sch-priority-radio-group">
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-priority-radio" value="high">
+                    <span class="priority-radio-badge">
+                      <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#ef4444;"></span>
+                      Tinggi (P1)
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-priority-radio" value="medium" checked>
+                    <span class="priority-radio-badge">
+                      <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#f59e0b;"></span>
+                      Sedang (P2)
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-priority-radio" value="low">
+                    <span class="priority-radio-badge">
+                      <span class="priority-indicator" style="width:6px; height:6px; border-radius:50%; background:#9ca3af;"></span>
+                      Rendah (P3)
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Perulangan Jadwal (Recurrence) -->
+              <div class="form-group">
+                <label class="form-label" style="margin-bottom:6px;">Ulangi Jadwal</label>
+                <div class="priority-radio-grid" id="sch-recurrence-radio-group" style="grid-template-columns: repeat(3, 1fr); gap:6px;">
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="none" checked>
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Hanya Sekali
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="daily">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Setiap Hari
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="weekdays">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Hari Kerja (Sen-Jum)
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="weekly">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Mingguan
+                    </span>
+                  </label>
+                  <label class="priority-radio-item">
+                    <input type="radio" name="sch-recurrence-radio" value="monthly">
+                    <span class="priority-radio-badge" style="font-size:12px; padding:7px 8px;">
+                      Bulanan
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Tenggat & Pengingat -->
+              <div class="modal-subcard">
+                <div class="form-group" style="margin-bottom:0;">
+                  <label class="form-label" for="sch-input-deadline" style="font-size:12px; margin-bottom:4px;">Tenggat Waktu / Deadline (Opsional)</label>
+                  <input type="date" id="sch-input-deadline" class="input-control" style="min-height:36px; height:36px; font-size:12px;">
+                </div>
+                <div class="settings-row" style="margin-top:10px; padding-top:8px; border-top:1px solid var(--border-subtle);">
+                  <div class="settings-row-text">
+                    <span class="settings-row-title" style="font-size:12.5px;">Pengingat Otomatis</span>
+                    <span class="settings-row-desc" style="font-size:11px;">Notifikasi & bel sebelum waktu mulai</span>
+                  </div>
+                  <label class="toggle-switch" for="sch-toggle-reminder" aria-label="Aktifkan Pengingat">
+                    <input type="checkbox" id="sch-toggle-reminder" checked class="toggle-input">
+                    <span class="toggle-track">
+                      <span class="toggle-thumb"></span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; gap:10px; margin-top:4px;">
+            <button type="button" class="btn btn-secondary" onclick="window.dayflowApp.closeAllModals()" style="flex:1;">
+              Batal
+            </button>
+            <button type="submit" class="btn btn-primary" style="flex:2;">
+              Simpan Jadwal
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Tambah/Edit Catatan (Bottom-sheet) -->
+    <div id="modal-note" class="modal-overlay" role="dialog" aria-modal="true">
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <h3 class="sheet-title" id="modal-note-title">Catatan Baru</h3>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup">
+            <span data-icon="x" data-icon-size="18"></span>
+          </button>
+        </div>
+
+        <form id="note-form" style="display:flex; flex-direction:column; gap:14px;">
+          <div class="form-group">
+            <label class="form-label" for="note-input-title">Judul Catatan (Opsional)</label>
+            <input type="text" id="note-input-title" class="input-control" placeholder="Judul ide atau memo...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="note-input-content">Isi Catatan</label>
+            <textarea id="note-input-content" class="input-control textarea-control" style="min-height:140px;" placeholder="Tuliskan catatanmu di sini..." required></textarea>
+          </div>
+
+          <div style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-secondary" onclick="window.dayflowApp.closeAllModals()" style="flex:1;">
+              Batal
+            </button>
+            <button type="submit" class="btn btn-primary" style="flex:2;">
+              Simpan Catatan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Konfirmasi Aksi (Custom Alert/Confirm Dialog) -->
+    <div id="modal-confirm" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
+      <div class="bottom-sheet confirm-sheet">
+        <div class="confirm-icon-wrap" id="confirm-modal-icon-wrap">
+          <span data-icon="alert" data-icon-size="22" id="confirm-modal-icon"></span>
+        </div>
+        <h3 class="sheet-title" id="confirm-modal-title" style="text-align:center; font-size:16px;">Konfirmasi Tindakan</h3>
+        <p class="text-muted" id="confirm-modal-desc" style="text-align:center; font-size:13px; line-height:1.5;">Apakah Anda yakin?</p>
+        <div style="display:flex; gap:10px; width:100%; margin-top:8px;">
+          <button type="button" class="btn btn-secondary" id="confirm-modal-btn-cancel" style="flex:1;">
+            Batal
+          </button>
+          <button type="button" class="btn btn-primary" id="confirm-modal-btn-accept" style="flex:1;">
+            Lanjutkan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Panduan & Tata Cara Gemini API Key -->
+    <div id="modal-api-guide" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="api-guide-title">
+      <div class="bottom-sheet" style="max-width:540px; max-height:85vh; overflow-y:auto;">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div>
+            <h3 class="sheet-title" id="api-guide-title">Tata Cara Menggunakan Gemini API Key</h3>
+            <p class="text-xs text-muted" style="margin-top:2px;">Panduan 4 langkah mudah dari Google AI Studio ke DayFlow</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs btn-icon btn-close-modal" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup Panduan">
+            <span data-icon="x" data-icon-size="16"></span>
+          </button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+          <!-- Step 1 -->
+          <div class="step-card" style="padding:14px; gap:8px; border-radius:var(--radius-md);">
+            <div class="step-card-header">
+              <div class="step-number-badge" style="width:26px; height:26px; font-size:13px;">1</div>
+              <span class="step-card-title" style="font-size:14px;">Buka Google AI Studio</span>
+            </div>
+            <p class="text-secondary" style="font-size:12.5px; line-height:1.5; padding-left:38px;">
+              Buka portal resmi Google AI Studio dan masuk menggunakan akun Google / Gmail Anda.
+            </p>
+            <div style="padding-left:38px;">
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-secondary btn-xs" style="text-decoration:none; display:inline-flex; align-items:center; gap:5px;">
+                Buka Google AI Studio
+                <span data-icon="arrowUpRight" data-icon-size="12"></span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="step-card" style="padding:14px; gap:8px; border-radius:var(--radius-md);">
+            <div class="step-card-header">
+              <div class="step-number-badge" style="width:26px; height:26px; font-size:13px;">2</div>
+              <span class="step-card-title" style="font-size:14px;">Klik "Create API Key"</span>
+            </div>
+            <p class="text-secondary" style="font-size:12.5px; line-height:1.5; padding-left:38px;">
+              Klik tombol biru bertuliskan <b>"Create API key"</b>. Pilih opsi default <i>Create API key in default project</i> (100% gratis tanpa kartu kredit).
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="step-card" style="padding:14px; gap:8px; border-radius:var(--radius-md);">
+            <div class="step-card-header">
+              <div class="step-number-badge" style="width:26px; height:26px; font-size:13px;">3</div>
+              <span class="step-card-title" style="font-size:14px;">Salin (Copy) Kunci API</span>
+            </div>
+            <p class="text-secondary" style="font-size:12.5px; line-height:1.5; padding-left:38px;">
+              Klik tombol <b>Copy</b> pada kunci yang muncul. Kunci API diawali dengan teks <code>AQ.</code>.
+            </p>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="step-card" style="padding:14px; gap:8px; border-radius:var(--radius-md);">
+            <div class="step-card-header">
+              <div class="step-number-badge" style="width:26px; height:26px; font-size:13px;">4</div>
+              <span class="step-card-title" style="font-size:14px;">Tempel ke Input DayFlow & Simpan</span>
+            </div>
+            <p class="text-secondary" style="font-size:12.5px; line-height:1.5; padding-left:38px;">
+              Tempelkan (<i>paste</i>) kode ke kolom <b>Gemini API Key</b> di bawah, tekan <b>Uji Koneksi Key</b>, lalu klik <b>Simpan Pengaturan</b>.
+            </p>
+          </div>
+
+          <!-- Footer Actions in Modal -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding-top:10px; border-top:1px solid var(--border-subtle); flex-wrap:wrap; gap:8px;">
+            <a href="/panduan-api.html" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="font-size:12px; text-decoration:none;">
+              <span data-icon="file-text" data-icon-size="14"></span>
+              Buka Halaman Dokumen Penuh
+              <span data-icon="arrowUpRight" data-icon-size="12"></span>
+            </a>
+            <button type="button" class="btn btn-primary btn-sm" onclick="window.dayflowApp.closeAllModals()">
+              Saya Mengerti
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Kelola & Tambah Kategori (Bottom-sheet) -->
+    <div id="modal-category" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-category-title">
+      <div class="bottom-sheet" style="max-width:500px; max-height:85vh; overflow-y:auto;">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div>
+            <h3 class="sheet-title" id="modal-category-title">Kelola Kategori Jadwal</h3>
+            <p class="text-xs text-muted" style="margin-top:2px;">Buat kategori baru atau hapus kategori kustom</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs btn-icon btn-close-modal" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup Kelola Kategori">
+            <span data-icon="x" data-icon-size="16"></span>
+          </button>
+        </div>
+
+        <!-- Form Tambah Kategori Baru -->
+        <form id="category-create-form" style="display:flex; flex-direction:column; gap:12px; margin-top:4px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" for="cat-input-name" style="font-size:12px; margin-bottom:4px;">Nama Kategori Baru</label>
+            <input type="text" id="cat-input-name" class="input-control" placeholder="Contoh: Kuliah, Olahraga, Belajar..." required style="min-height:38px; height:38px; font-size:13px;">
+          </div>
+
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:12px; margin-bottom:4px;">Pilih Warna Indikator</label>
+            <div class="color-picker-grid" id="cat-color-picker">
+              <!-- Populated dynamically -->
+            </div>
+            <input type="hidden" id="cat-input-color" value="#f97316">
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-sm" style="width:100%; margin-top:4px;">
+            <span data-icon="plus" data-icon-size="14"></span>
+            Simpan Kategori Baru
+          </button>
+        </form>
+
+        <!-- Daftar Kategori Aktif -->
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle);">
+          <div class="form-label" style="font-size:12px; margin-bottom:8px;">Daftar Kategori Aktif</div>
+          <div class="category-manage-list" id="category-manage-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Share Schedule / Daily Agenda -->
+    <div id="modal-share-schedule" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-share-title">
+      <div class="bottom-sheet" style="max-width:540px; max-height:85vh; overflow-y:auto;">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div>
+            <h3 class="sheet-title" id="modal-share-title">Bagikan Agenda Harian</h3>
+            <p class="text-xs text-muted" id="modal-share-subtitle" style="margin-top:2px;">Agenda untuk Hari Ini</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs btn-icon btn-close-modal" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup Dialog Berbagi">
+            <span data-icon="x" data-icon-size="16"></span>
+          </button>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <span class="text-xs text-muted">Format teks siap kirim ke WhatsApp atau Slack</span>
+            <span class="badge-tag" id="share-item-count">0 kegiatan</span>
+          </div>
+
+          <textarea id="share-text-preview" class="input-control" rows="8" style="font-family:var(--font-mono); font-size:12px; line-height:1.5; resize:vertical;" readonly></textarea>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <button class="btn btn-primary btn-sm" id="btn-send-whatsapp">
+              <span data-icon="share" data-icon-size="14"></span>
+              Kirim ke WhatsApp
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-copy-share-text">
+              <span data-icon="copy" data-icon-size="14"></span>
+              Salin Teks Agenda
+            </button>
+          </div>
+
+          <div style="padding-top:10px; border-top:1px solid var(--border-subtle); display:flex; flex-direction:column; gap:8px;">
+            <span class="text-xs text-muted">Sinkronisasi Kalender Eksternal:</span>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-download-ics">
+                <span data-icon="calendar" data-icon-size="14"></span>
+                Unduh File .ICS
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-open-first-gcal">
+                <span data-icon="external-link" data-icon-size="14"></span>
+                Google Calendar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+
+`;
+  function mountModals() {
+    let root = document.getElementById("modals-root");
+    if (!root) {
+      root = document.createElement("div");
+      root.id = "modals-root";
+      document.body.appendChild(root);
+    }
+    if (!root.innerHTML || root.innerHTML.trim() === "") {
+      root.innerHTML = MODALS_HTML;
+      renderIcons(root);
+    }
+  }
+
   // js/components/modals.js
   var modalMethods = {
+    mountModals() {
+      mountModals();
+    },
     openScheduleModal(scheduleId = null) {
+      this.mountModals();
       this.closeAllModals();
       this.editingScheduleId = scheduleId;
       const modal = document.getElementById("modal-schedule");
@@ -2073,6 +2866,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       this.closeAllModals();
     },
     openNoteModal(noteId = null) {
+      this.mountModals();
       this.closeAllModals();
       this.editingNoteId = noteId;
       const modal = document.getElementById("modal-note");
@@ -2149,6 +2943,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       }
     },
     openCategoryModal(onCreatedCallback = null) {
+      this.mountModals();
       const modal = document.getElementById("modal-category");
       if (!modal) return;
       const colorPickerContainer = document.getElementById("cat-color-picker");
@@ -2252,6 +3047,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       });
     },
     openShareModal(targetDate = null) {
+      this.mountModals();
       this.closeAllModals();
       const modal = document.getElementById("modal-share-schedule");
       if (!modal) return;
@@ -2340,6 +3136,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       this.editingNoteId = null;
     },
     openApiGuideModal() {
+      this.mountModals();
       const modal = document.getElementById("modal-api-guide");
       if (modal) {
         modal.classList.add("open");
@@ -2356,6 +3153,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const schedules = state.getSchedules(today);
       const settings = state.getSettings();
       this.renderTodayBanner(settings, schedules);
+      this.renderTodayProgressBar();
       const completedCount = schedules.filter((s) => s.completed).length;
       const statsCounterEl = document.getElementById("today-stats-counter");
       if (statsCounterEl) {
@@ -2896,19 +3694,91 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         notifications.showToast("Gagal menyimpan file banner ke browser.", "danger");
       }
     },
+    renderTodayProgressBar() {
+      const widget = document.getElementById("today-schedule-progress-widget");
+      if (!widget) return;
+      const prod = state.getTodayProductivity();
+      const stats = state.getProfileProductivityStats();
+      const percentEl = document.getElementById("today-progress-percent");
+      const metaEl = document.getElementById("today-progress-meta");
+      const trackEl = document.getElementById("today-progress-track");
+      const fillEl = document.getElementById("today-progress-fill");
+      const countdownText = document.getElementById("today-countdown-text");
+      const statusText = document.getElementById("today-progress-status-text");
+      const streakText = document.getElementById("today-streak-text");
+      if (percentEl) percentEl.textContent = `${prod.percentage}%`;
+      if (metaEl) {
+        if (prod.totalScheduled === 0) {
+          metaEl.textContent = "Belum ada agenda hari ini";
+        } else {
+          metaEl.textContent = `${prod.completedCount} dari ${prod.totalScheduled} kegiatan selesai`;
+        }
+      }
+      if (trackEl) {
+        trackEl.setAttribute("aria-valuenow", prod.percentage);
+        trackEl.setAttribute("aria-valuemax", 100);
+      }
+      if (fillEl) {
+        fillEl.style.width = `${prod.percentage}%`;
+        fillEl.classList.toggle("is-complete", prod.isComplete);
+      }
+      if (countdownText) {
+        if (prod.isComplete) {
+          countdownText.textContent = "Tuntas 100% Hari Ini";
+        } else {
+          countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
+        }
+      }
+      if (statusText) {
+        if (prod.totalScheduled === 0) {
+          statusText.textContent = "Tambahkan jadwal kegiatan untuk mengaktifkan target hari ini.";
+        } else if (prod.isComplete) {
+          statusText.textContent = "Luar biasa! Seluruh agenda hari ini berhasil dituntaskan.";
+        } else {
+          const remaining = prod.totalScheduled - prod.completedCount;
+          statusText.textContent = `${remaining} kegiatan lagi untuk mencapai 100% tuntas sebelum pukul 24:00.`;
+        }
+      }
+      if (streakText) {
+        if (stats.perfectDays > 0) {
+          streakText.textContent = `${stats.perfectDays} Hari Tuntas`;
+        } else {
+          streakText.textContent = "Target Hari Ini";
+        }
+      }
+      if (prod.isComplete && !this._lastCelebratedComplete) {
+        this._lastCelebratedComplete = true;
+        try {
+          if (typeof particleBurst === "function") {
+            particleBurst(widget);
+          }
+        } catch (e) {
+        }
+      } else if (!prod.isComplete) {
+        this._lastCelebratedComplete = false;
+      }
+    },
     initRealtimeClock() {
       const updateClock = () => {
         const clockEl = document.getElementById("banner-live-clock");
-        if (!clockEl) return;
-        const now = /* @__PURE__ */ new Date();
-        const h = String(now.getHours()).padStart(2, "0");
-        const m = String(now.getMinutes()).padStart(2, "0");
-        const s = String(now.getSeconds()).padStart(2, "0");
-        clockEl.textContent = `${h}:${m}:${s}`;
+        if (clockEl) {
+          const now = /* @__PURE__ */ new Date();
+          const h = String(now.getHours()).padStart(2, "0");
+          const m = String(now.getMinutes()).padStart(2, "0");
+          const s = String(now.getSeconds()).padStart(2, "0");
+          clockEl.textContent = `${h}:${m}:${s}`;
+        }
       };
       updateClock();
       if (!this._realtimeClockInterval) {
-        this._realtimeClockInterval = setInterval(updateClock, 1e3);
+        this._realtimeClockInterval = setInterval(() => {
+          updateClock();
+          const countdownText = document.getElementById("today-countdown-text");
+          if (countdownText && !countdownText.textContent.includes("Tuntas 100%")) {
+            const prod = state.getTodayProductivity();
+            countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
+          }
+        }, 1e3);
       }
     }
   };
@@ -3514,6 +4384,273 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       }
       return { cleanText, schedules };
     },
+    // --- Extract note items from Gemini Assistant Message ---
+    extractNotesFromAssistantMessage(rawText) {
+      if (!rawText || typeof rawText !== "string") {
+        return { cleanText: "", note: null };
+      }
+      let cleanText = rawText;
+      let note = null;
+      const tagMatch = rawText.match(/\[DAYFLOW_NOTE\]([\s\S]*?)\[\/DAYFLOW_NOTE\]/i);
+      if (tagMatch) {
+        let block = tagMatch[1].trim();
+        block = block.replace(/```json/gi, "").replace(/```/g, "").trim();
+        try {
+          const parsed = JSON.parse(block);
+          if (parsed && typeof parsed === "object") {
+            note = {
+              title: String(parsed.title || parsed.judul || "Catatan Baru").trim(),
+              content: String(parsed.content || parsed.isi || parsed.notes || "").trim()
+            };
+          }
+        } catch (err1) {
+          try {
+            const titleMatch = block.match(/"(?:title|judul)"\s*:\s*"([^"]+)"/i);
+            const contentMatch = block.match(/"(?:content|isi|notes)"\s*:\s*"([\s\S]*?)"\s*(?:,\s*"|\n\s*})/i) || block.match(/"(?:content|isi|notes)"\s*:\s*"([\s\S]*?)"/i);
+            if (titleMatch || contentMatch) {
+              note = {
+                title: titleMatch ? titleMatch[1].trim() : "Catatan Baru",
+                content: contentMatch ? contentMatch[1].trim() : ""
+              };
+            }
+          } catch (err2) {
+            console.warn("Failed parsing [DAYFLOW_NOTE] tag:", err2);
+          }
+        }
+        cleanText = rawText.replace(/\[DAYFLOW_NOTE\][\s\S]*?\[\/DAYFLOW_NOTE\]/gi, "").trim();
+      }
+      return { cleanText, note };
+    },
+    // --- Multimodal Attachment Handlers (Image, PDF, Text, CSV) ---
+    currentAttachment: null,
+    handleFileSelect(file) {
+      if (!file) return Promise.resolve(null);
+      const previewContainer = document.getElementById("chat-attachment-preview");
+      const previewImg = document.getElementById("attachment-preview-img");
+      const previewDoc = document.getElementById("attachment-preview-doc");
+      const fileNameEl = document.getElementById("attachment-file-name");
+      const fileSizeEl = document.getElementById("attachment-file-size");
+      const formatSize = (bytes) => {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      };
+      return new Promise((resolve, reject) => {
+        try {
+          const isImage = file.type.startsWith("image/");
+          const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+          const isText = file.type.startsWith("text/") || /\.(txt|csv|md|json|ics)$/i.test(file.name);
+          if (!isImage && !isPdf && !isText) {
+            notifications.showToast("Format berkas tidak didukung. Harap pilih gambar (JPG/PNG), PDF, atau berkas teks/CSV.", "warning");
+            return resolve(null);
+          }
+          if (isImage) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const rawDataUrl = e.target.result;
+              const img = new Image();
+              img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 1600;
+                if (width > maxDim || height > maxDim) {
+                  if (width > height) {
+                    height = Math.round(height * maxDim / width);
+                    width = maxDim;
+                  } else {
+                    width = Math.round(width * maxDim / height);
+                    height = maxDim;
+                  }
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+                const compressedUrl = canvas.toDataURL("image/jpeg", 0.84);
+                const thumbCanvas = document.createElement("canvas");
+                const thumbMax = 180;
+                let tW = img.width;
+                let tH = img.height;
+                if (tW > tH && tW > thumbMax) {
+                  tH = Math.round(tH * thumbMax / tW);
+                  tW = thumbMax;
+                } else if (tH > thumbMax) {
+                  tW = Math.round(tW * thumbMax / tH);
+                  tH = thumbMax;
+                }
+                thumbCanvas.width = tW;
+                thumbCanvas.height = tH;
+                thumbCanvas.getContext("2d").drawImage(img, 0, 0, tW, tH);
+                const thumbUrl = thumbCanvas.toDataURL("image/jpeg", 0.6);
+                const b64 = compressedUrl.split(",")[1];
+                this.currentAttachment = {
+                  name: file.name || "foto.jpg",
+                  type: "image",
+                  mimeType: "image/jpeg",
+                  size: file.size,
+                  base64: b64,
+                  thumbUrl,
+                  isImage: true,
+                  isDoc: false
+                };
+                if (previewImg) {
+                  previewImg.src = thumbUrl;
+                  previewImg.classList.remove("hidden");
+                }
+                if (previewDoc) previewDoc.classList.add("hidden");
+                if (fileSizeEl) fileSizeEl.textContent = formatSize(file.size);
+                if (previewContainer) previewContainer.classList.remove("hidden");
+                notifications.showToast(`Gambar "${file.name}" terlampir. Siap dianalisis!`, "info", 2500);
+                resolve(this.currentAttachment);
+              };
+              img.onerror = (err) => reject(err);
+              img.src = rawDataUrl;
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+          } else if (isPdf) {
+            if (file.size > 10 * 1024 * 1024) {
+              notifications.showToast("Ukuran berkas PDF maksimal 10MB.", "warning");
+              return resolve(null);
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const dataUrl = e.target.result;
+              const b64 = dataUrl.split(",")[1];
+              this.currentAttachment = {
+                name: file.name || "dokumen.pdf",
+                type: "pdf",
+                mimeType: "application/pdf",
+                size: file.size,
+                base64: b64,
+                thumbUrl: "",
+                isImage: false,
+                isDoc: true
+              };
+              if (previewImg) previewImg.classList.add("hidden");
+              if (previewDoc) {
+                previewDoc.classList.remove("hidden");
+                if (fileNameEl) fileNameEl.textContent = file.name;
+              }
+              if (fileSizeEl) fileSizeEl.textContent = formatSize(file.size);
+              if (previewContainer) previewContainer.classList.remove("hidden");
+              notifications.showToast(`Dokumen PDF "${file.name}" terlampir.`, "info", 2500);
+              resolve(this.currentAttachment);
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+          } else {
+            if (file.size > 1024 * 1024) {
+              notifications.showToast("Ukuran berkas teks maksimal 1MB.", "warning");
+              return resolve(null);
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const text = e.target.result;
+              this.currentAttachment = {
+                name: file.name || "dokumen.txt",
+                type: "text",
+                mimeType: file.type || "text/plain",
+                size: file.size,
+                textContent: text,
+                base64: null,
+                thumbUrl: "",
+                isImage: false,
+                isDoc: true
+              };
+              if (previewImg) previewImg.classList.add("hidden");
+              if (previewDoc) {
+                previewDoc.classList.remove("hidden");
+                if (fileNameEl) fileNameEl.textContent = file.name;
+              }
+              if (fileSizeEl) fileSizeEl.textContent = formatSize(file.size);
+              if (previewContainer) previewContainer.classList.remove("hidden");
+              notifications.showToast(`Berkas "${file.name}" terlampir.`, "info", 2500);
+              resolve(this.currentAttachment);
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsText(file);
+          }
+        } catch (err) {
+          console.error("Error attaching file:", err);
+          notifications.showToast("Gagal memproses lampiran: " + err.message, "error");
+          resolve(null);
+        }
+      });
+    },
+    clearCurrentAttachment() {
+      this.currentAttachment = null;
+      const previewContainer = document.getElementById("chat-attachment-preview");
+      if (previewContainer) previewContainer.classList.add("hidden");
+      const fileInput = document.getElementById("chat-file-input");
+      if (fileInput) fileInput.value = "";
+    },
+    initChatAttachments() {
+      const attachBtn = document.getElementById("btn-chat-attach-file");
+      const fileInput = document.getElementById("chat-file-input");
+      const cancelBtn = document.getElementById("btn-cancel-attachment");
+      const chatInput = document.getElementById("chat-input");
+      const chatHistory = document.getElementById("chat-history");
+      if (attachBtn && fileInput && !attachBtn._hasAttachHandler) {
+        attachBtn._hasAttachHandler = true;
+        attachBtn.addEventListener("click", () => {
+          fileInput.click();
+        });
+        fileInput.addEventListener("change", (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (file) {
+            this.handleFileSelect(file);
+          }
+        });
+      }
+      if (cancelBtn && !cancelBtn._hasCancelHandler) {
+        cancelBtn._hasCancelHandler = true;
+        cancelBtn.addEventListener("click", () => {
+          this.clearCurrentAttachment();
+        });
+      }
+      if (chatInput && !chatInput._hasPasteHandler) {
+        chatInput._hasPasteHandler = true;
+        chatInput.addEventListener("paste", (e) => {
+          const clipboardItems = e.clipboardData && e.clipboardData.items;
+          if (!clipboardItems) return;
+          for (let i = 0; i < clipboardItems.length; i++) {
+            const item = clipboardItems[i];
+            if (item.type.indexOf("image") !== -1) {
+              const blob = item.getAsFile();
+              if (blob) {
+                e.preventDefault();
+                this.handleFileSelect(blob);
+                break;
+              }
+            }
+          }
+        });
+      }
+      const dropZones = [chatHistory, document.getElementById("chat-form")].filter(Boolean);
+      dropZones.forEach((zone) => {
+        if (zone && !zone._hasDragHandler) {
+          zone._hasDragHandler = true;
+          zone.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            zone.style.outline = "2px dashed var(--accent-primary)";
+            zone.style.outlineOffset = "-4px";
+          });
+          zone.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            zone.style.outline = "none";
+          });
+          zone.addEventListener("drop", (e) => {
+            e.preventDefault();
+            zone.style.outline = "none";
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (file) {
+              this.handleFileSelect(file);
+            }
+          });
+        }
+      });
+    },
     setupChatDelegation(containerEl) {
       if (!containerEl || containerEl._hasChatDelegation) return;
       containerEl._hasChatDelegation = true;
@@ -3543,6 +4680,29 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           }
           return;
         }
+        const saveNoteBtn = target.closest('[data-action="save-chat-note"]');
+        if (saveNoteBtn) {
+          e.stopPropagation();
+          const msgId = saveNoteBtn.getAttribute("data-msg-id");
+          const rawTitle = saveNoteBtn.getAttribute("data-note-title");
+          const rawContent = saveNoteBtn.getAttribute("data-note-content");
+          if (!rawTitle && !rawContent) return;
+          try {
+            const title = decodeURIComponent(rawTitle || "Catatan AI");
+            const content = decodeURIComponent(rawContent || "");
+            state.addNote(title, content);
+            state.updateChatMessage(msgId, { savedNote: true });
+            particleBurst(saveNoteBtn, "var(--status-success)");
+            springBounce(saveNoteBtn);
+            notifications.playChime();
+            notifications.showToast("Catatan berhasil disimpan ke Catatan & Memo!", "success");
+            this.renderAiPlanView();
+          } catch (err) {
+            console.error("Error saving chat note:", err);
+            notifications.showToast("Gagal menyimpan catatan.", "warning");
+          }
+          return;
+        }
         const viewBtn = target.closest('[data-action="view-chat-date"]');
         if (viewBtn) {
           e.stopPropagation();
@@ -3556,22 +4716,44 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
     },
     // --- 3. AI Plan View ---
     renderAiPlanView() {
+      this.initChatAttachments();
       const chatHistoryEl = document.getElementById("chat-history");
       if (chatHistoryEl) {
         this.setupChatDelegation(chatHistoryEl);
         const history = state.getChatHistory();
         chatHistoryEl.innerHTML = history.map((msg, idx) => {
           if (msg.role === "user") {
+            let attachmentHtml = "";
+            if (msg.attachment) {
+              if (msg.attachment.isImage && msg.attachment.thumbUrl) {
+                attachmentHtml = `
+                <div class="chat-bubble-attachment">
+                  <img src="${msg.attachment.thumbUrl}" class="chat-attachment-img" alt="${escapeHtml(msg.attachment.name || "Foto")}">
+                </div>
+              `;
+              } else if (msg.attachment.isDoc) {
+                attachmentHtml = `
+                <div class="chat-bubble-attachment">
+                  <div class="chat-attachment-pill">
+                    <span data-icon="file" data-icon-size="14"></span>
+                    <span>${escapeHtml(msg.attachment.name || "Dokumen")}</span>
+                  </div>
+                </div>
+              `;
+              }
+            }
             return `
             <div class="chat-bubble chat-bubble-user">
-              <div class="chat-bubble-content">${formatMarkdown(msg.text)}</div>
+              ${attachmentHtml}
+              <div class="chat-bubble-content">${formatMarkdown(msg.text || "")}</div>
               <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
                 ${new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
           `;
           }
-          const { cleanText, schedules } = this.extractSchedulesFromAssistantMessage(msg.text);
+          const { cleanText: textAfterSchedule, schedules } = this.extractSchedulesFromAssistantMessage(msg.text);
+          const { cleanText: finalCleanText, note } = this.extractNotesFromAssistantMessage(textAfterSchedule);
           let scheduleCardHtml = "";
           if (schedules.length > 0) {
             const targetDate = schedules[0].date || getLocalDateString();
@@ -3651,10 +4833,48 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
             </div>
           `;
           }
+          let noteCardHtml = "";
+          if (note) {
+            const encodedTitle = encodeURIComponent(note.title);
+            const encodedContent = encodeURIComponent(note.content);
+            let noteFooter = "";
+            if (msg.savedNote) {
+              noteFooter = `
+              <div class="chat-note-actions-row">
+                <span class="chat-note-saved-badge">
+                  ${getIcon("check", "", 12)} Tersimpan di Catatan
+                </span>
+              </div>
+            `;
+            } else {
+              noteFooter = `
+              <div class="chat-note-actions-row">
+                <button type="button" class="btn btn-primary btn-xs" data-action="save-chat-note" data-msg-id="${msg.id || "msg_idx_" + idx}" data-note-title="${encodedTitle}" data-note-content="${encodedContent}" style="font-size:11px; padding:4px 10px; cursor:pointer;">
+                  ${getIcon("file-text", "", 12)} Simpan sebagai Catatan
+                </button>
+              </div>
+            `;
+            }
+            noteCardHtml = `
+            <div class="chat-note-card">
+              <div class="chat-note-header">
+                <div class="chat-note-title-tag">
+                  <span data-icon="file-text" data-icon-size="13"></span>
+                  ${escapeHtml(note.title)}
+                </div>
+              </div>
+              <div class="chat-note-body">
+                ${formatMarkdown(note.content)}
+              </div>
+              ${noteFooter}
+            </div>
+          `;
+          }
           return `
           <div class="chat-bubble chat-bubble-assistant">
-            <div class="chat-bubble-content">${formatMarkdown(cleanText || msg.text)}</div>
+            <div class="chat-bubble-content">${formatMarkdown(finalCleanText || msg.text)}</div>
             ${scheduleCardHtml}
+            ${noteCardHtml}
             <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
               ${new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
             </div>
@@ -3669,25 +4889,43 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       e.preventDefault();
       const input = document.getElementById("chat-input");
       const text = input ? input.value.trim() : "";
-      if (!text) return;
-      input.value = "";
-      state.addChatMessage("user", text);
+      const activeAttachment = this.currentAttachment;
+      if (!text && !activeAttachment) return;
+      if (input) input.value = "";
+      let attachmentMeta = null;
+      if (activeAttachment) {
+        attachmentMeta = {
+          name: activeAttachment.name,
+          type: activeAttachment.type,
+          isImage: activeAttachment.isImage,
+          isDoc: activeAttachment.isDoc,
+          thumbUrl: activeAttachment.thumbUrl || ""
+        };
+      }
+      this.clearCurrentAttachment();
+      state.addChatMessage("user", text || (activeAttachment ? `Lampiran: ${activeAttachment.name}` : ""), false, {
+        attachment: attachmentMeta
+      });
       this.renderAiPlanView();
       const submitBtn = document.getElementById("chat-submit-btn");
       if (submitBtn) submitBtn.disabled = true;
       const autoSaveToggle = document.getElementById("chat-auto-save-toggle");
       const shouldAutoSave = autoSaveToggle ? autoSaveToggle.checked : !!state.getSettings().chatAutoSave;
       try {
-        const reply = await GeminiService.sendChatMessage(text);
+        const reply = await GeminiService.sendChatMessage(text, activeAttachment);
         const { schedules } = this.extractSchedulesFromAssistantMessage(reply);
-        let isSaved = false;
+        const { note } = this.extractNotesFromAssistantMessage(reply);
+        let isScheduleSaved = false;
         if (shouldAutoSave && schedules && schedules.length > 0) {
           state.addSchedules(schedules);
-          isSaved = true;
+          isScheduleSaved = true;
           notifications.playChime();
           notifications.showToast(`${schedules.length} agenda otomatis dimasukkan ke jadwal!`, "success");
         }
-        state.addChatMessage("assistant", reply, false, { savedSchedules: isSaved });
+        state.addChatMessage("assistant", reply, false, {
+          savedSchedules: isScheduleSaved,
+          savedNote: false
+        });
       } catch (err) {
         console.warn("AI chat error, attempting offline extraction fallback:", err);
         const fallbackItems = this.extractSchedulesFromText(text);
@@ -3724,6 +4962,7 @@ ${JSON.stringify(fallbackItems)}
         icon: "trash"
       });
       if (confirmed) {
+        this.clearCurrentAttachment();
         state.clearChatHistory();
         notifications.showToast("Riwayat percakapan telah dibersihkan.", "info");
       }
@@ -3884,6 +5123,9 @@ ${JSON.stringify(fallbackItems)}
       if (soundToggle) soundToggle.checked = settings.soundEnabled !== false;
       if (toneSelect) toneSelect.value = settings.soundTone || "crystal";
       if (proactiveToggle) proactiveToggle.checked = settings.proactiveReminders !== false;
+      const systemNotifToggle = document.getElementById("setting-system-notif");
+      if (systemNotifToggle) systemNotifToggle.checked = settings.systemNotificationsEnabled !== false;
+      this.updateNotificationPermissionUI();
       const themeRadio = document.querySelector(`input[name="setting-theme"][value="${settings.theme || "dark"}"]`);
       if (themeRadio) themeRadio.checked = true;
       const advanceVal = parseInt(settings.notifyAdvanceMinutes || 15, 10);
@@ -3898,6 +5140,7 @@ ${JSON.stringify(fallbackItems)}
       });
       this.updateModelPickerUI(settings.geminiModel || "gemini-2.5-flash");
       this.renderBannerSettings(settings);
+      this.renderProfileProductivity();
       this.renderSettingsCategoriesPreview();
     },
     updateModelPickerUI(modelId = "gemini-2.5-flash") {
@@ -3923,6 +5166,7 @@ ${JSON.stringify(fallbackItems)}
       const bannerQuoteInput = document.getElementById("setting-banner-quote");
       const bannerUrlInput = document.getElementById("setting-banner-url");
       const bannerEnabledToggle = document.getElementById("setting-banner-enabled");
+      const systemNotifToggle = document.getElementById("setting-system-notif");
       state.updateSettings({
         userName: userNameInput ? userNameInput.value.trim() : "",
         heroBannerEnabled: bannerEnabledToggle ? bannerEnabledToggle.checked : false,
@@ -3935,6 +5179,7 @@ ${JSON.stringify(fallbackItems)}
         soundEnabled: soundToggle ? soundToggle.checked : true,
         soundTone: selectedTone,
         proactiveReminders: proactiveToggle ? proactiveToggle.checked : true,
+        systemNotificationsEnabled: systemNotifToggle ? systemNotifToggle.checked : true,
         theme: themeValue
       });
       this.applyTheme(themeValue);
@@ -4001,6 +5246,7 @@ ${JSON.stringify(fallbackItems)}
         schedules: state.schedules,
         notes: state.notes,
         categories: state.getCategories(),
+        dailyLogs: state.dailyLogs,
         settings: { ...state.settings, apiKey: "" }
         // don't export plain secret
       };
@@ -4028,6 +5274,9 @@ ${JSON.stringify(fallbackItems)}
           }
           if (parsed.categories && Array.isArray(parsed.categories)) {
             localStorage.setItem("dayflow_categories_v1", JSON.stringify(parsed.categories));
+          }
+          if (parsed.dailyLogs && Array.isArray(parsed.dailyLogs)) {
+            localStorage.setItem("dayflow_daily_logs_v1", JSON.stringify(parsed.dailyLogs));
           }
           if (parsed.settings && typeof parsed.settings === "object" && !Array.isArray(parsed.settings)) {
             const currentSettings = state.getSettings();
@@ -4060,6 +5309,110 @@ ${JSON.stringify(fallbackItems)}
       `;
       });
       previewEl.innerHTML = html;
+    },
+    updateNotificationPermissionUI() {
+      const badge = document.getElementById("notif-permission-badge");
+      const desc = document.getElementById("notif-permission-desc");
+      const actionRow = document.getElementById("notif-permission-action-row");
+      const enableBtn = document.getElementById("btn-enable-system-notif");
+      const statusText = document.getElementById("notif-action-status-text");
+      const perm = notifications.getPermissionStatus();
+      if (badge) {
+        if (perm === "granted") {
+          badge.style.background = "rgba(34, 197, 94, 0.12)";
+          badge.style.color = "#22c55e";
+          badge.style.borderColor = "rgba(34, 197, 94, 0.25)";
+          badge.textContent = "\u25CF Aktif & Disetujui";
+          if (actionRow) actionRow.style.display = "none";
+          if (desc) desc.textContent = "DayFlow memiliki izin penuh untuk memunculkan pop-up jadwal di layar dan status bar peramban.";
+        } else if (perm === "denied") {
+          badge.style.background = "rgba(239, 68, 68, 0.12)";
+          badge.style.color = "#ef4444";
+          badge.style.borderColor = "rgba(239, 68, 68, 0.25)";
+          badge.textContent = "\u25CF Diblokir Browser";
+          if (actionRow) actionRow.style.display = "flex";
+          if (enableBtn) enableBtn.style.display = "none";
+          if (statusText) statusText.innerHTML = "Izin notifikasi diblokir browser. Klik ikon gembok pada bilah URL, lalu ubah <b>Notifikasi</b> menjadi <b>Izinkan</b>.";
+          if (desc) desc.textContent = "Browser memblokir pop-up notifikasi. Silakan buka izin pada bilah alamat web.";
+        } else if (perm === "unsupported") {
+          badge.style.background = "rgba(148, 163, 184, 0.12)";
+          badge.style.color = "#94a3b8";
+          badge.style.borderColor = "rgba(148, 163, 184, 0.25)";
+          badge.textContent = "\u25CF Tidak Didukung";
+          if (actionRow) actionRow.style.display = "none";
+          if (desc) desc.textContent = "Peramban ini tidak mendukung Web Notifications API standar.";
+        } else {
+          badge.style.background = "rgba(245, 158, 11, 0.12)";
+          badge.style.color = "#f59e0b";
+          badge.style.borderColor = "rgba(245, 158, 11, 0.25)";
+          badge.textContent = "\u25CF Belum Diaktifkan";
+          if (actionRow) actionRow.style.display = "flex";
+          if (enableBtn) {
+            enableBtn.style.display = "inline-flex";
+          }
+          if (statusText) statusText.textContent = 'Klik "Izinkan Notifikasi" agar pengingat agenda harian bisa tampil di luar peramban.';
+        }
+        renderIcons(actionRow || document);
+      }
+    },
+    renderProfileProductivity() {
+      const card = document.getElementById("profile-productivity-card");
+      if (!card) return;
+      const settings = state.getSettings();
+      const stats = state.getProfileProductivityStats();
+      const nameEl = document.getElementById("profile-card-name");
+      if (nameEl) {
+        nameEl.textContent = settings.userName ? `Profil ${escapeHtml(settings.userName)}` : "Profil Pengguna";
+      }
+      const statInputted = document.getElementById("stat-today-inputted");
+      const statCompleted = document.getElementById("stat-today-completed");
+      const statPercent = document.getElementById("stat-today-percent");
+      const statStreak = document.getElementById("stat-perfect-streak");
+      if (statInputted) statInputted.textContent = stats.todayTotal;
+      if (statCompleted) statCompleted.textContent = stats.todayCompleted;
+      if (statPercent) statPercent.textContent = `${stats.todayPercent}%`;
+      if (statStreak) statStreak.textContent = stats.perfectDays;
+      const historyList = document.getElementById("profile-history-list");
+      if (!historyList) return;
+      const logs = state.getDailyLogs(10);
+      if (!logs || logs.length === 0) {
+        historyList.innerHTML = `
+        <div class="profile-history-empty text-xs text-muted" style="padding: 12px 0;">
+          Belum ada riwayat tercatat. Rekap hari ini akan tersimpan otomatis setiap pukul 24:00.
+        </div>
+      `;
+        return;
+      }
+      let html = "";
+      logs.forEach((log) => {
+        const isToday = log.date === getLocalDateString();
+        const dateObj = /* @__PURE__ */ new Date(log.date + "T00:00:00");
+        const dateLabel = isToday ? "Hari Ini" : dateObj.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "short" });
+        let badgeClass = "badge-muted";
+        let badgeText = "Istirahat";
+        if (log.totalScheduled > 0) {
+          if (log.percentage === 100) {
+            badgeClass = "badge-success";
+            badgeText = "100% Tuntas";
+          } else {
+            badgeClass = "badge-warning";
+            badgeText = `${log.completedCount}/${log.totalScheduled} Selesai`;
+          }
+        }
+        html += `
+        <div class="profile-history-item ${isToday ? "is-today" : ""}">
+          <div class="profile-history-info">
+            <span class="profile-history-date tabular-nums">${escapeHtml(dateLabel)}</span>
+            <span class="profile-history-badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="profile-history-track">
+            <div class="profile-history-fill ${log.percentage === 100 ? "is-perfect" : ""}" style="width: ${log.percentage}%;"></div>
+          </div>
+          <span class="profile-history-percent tabular-nums font-mono">${log.percentage}%</span>
+        </div>
+      `;
+      });
+      historyList.innerHTML = html;
     }
   };
 
@@ -4075,14 +5428,18 @@ ${JSON.stringify(fallbackItems)}
       this.pendingAiSchedules = [];
       this._activeBannerBlobUrl = null;
       this._settingsAlertTimer = null;
+      this.state = state;
+      window.dayflowState = state;
       window.dayflowApp = this;
       window._actualDayflowApp = this;
     }
     init() {
       try {
+        this.mountModals();
         this.applyTheme(state.getSettings().theme || "dark");
         this.setupThemeListener();
         notifications.init();
+        this.initRealtimeClock();
         this.bindEvents();
         this.render();
         window.__dayflow_ready = true;
@@ -4246,15 +5603,21 @@ ${JSON.stringify(fallbackItems)}
       });
       const notifBtn = document.getElementById("btn-request-notif");
       if (notifBtn) {
-        notifBtn.addEventListener("click", () => {
-          notifications.requestPermission();
+        notifBtn.addEventListener("click", async () => {
+          springBounce(notifBtn);
+          const tone = state.getSettings().soundTone || "crystal";
+          await notifications.testNotification(tone);
+          if (typeof this.updateNotificationPermissionUI === "function") {
+            this.updateNotificationPermissionUI();
+          }
         });
       }
       const testAudioBtn = document.getElementById("btn-test-chime");
       if (testAudioBtn) {
         testAudioBtn.addEventListener("click", () => {
+          springBounce(testAudioBtn);
           const toneInput = document.getElementById("setting-sound-tone");
-          const selectedTone = toneInput ? toneInput.value : "crystal";
+          const selectedTone = toneInput ? toneInput.value : state.getSettings().soundTone || "crystal";
           notifications.playChime(selectedTone);
           const toneNames = {
             crystal: "Crystal Bell",
@@ -4262,7 +5625,29 @@ ${JSON.stringify(fallbackItems)}
             digital: "Digital Pulse"
           };
           const name = toneNames[selectedTone] || "Crystal Bell";
-          notifications.showToast(`Bel akustik (${name}) diputar.`, "info");
+          notifications.showToast(`Bel akustik (${name}) berbunyi.`, "info");
+        });
+      }
+      const testSystemNotifBtn = document.getElementById("btn-test-system-notif");
+      if (testSystemNotifBtn) {
+        testSystemNotifBtn.addEventListener("click", async () => {
+          springBounce(testSystemNotifBtn);
+          const toneInput = document.getElementById("setting-sound-tone");
+          const selectedTone = toneInput ? toneInput.value : state.getSettings().soundTone || "crystal";
+          await notifications.testNotification(selectedTone);
+          if (typeof this.updateNotificationPermissionUI === "function") {
+            this.updateNotificationPermissionUI();
+          }
+        });
+      }
+      const enableNotifBtn = document.getElementById("btn-enable-system-notif");
+      if (enableNotifBtn) {
+        enableNotifBtn.addEventListener("click", async () => {
+          springBounce(enableNotifBtn);
+          await notifications.requestPermission();
+          if (typeof this.updateNotificationPermissionUI === "function") {
+            this.updateNotificationPermissionUI();
+          }
         });
       }
       document.querySelectorAll(".segmented-chip").forEach((chip) => {
@@ -4304,13 +5689,11 @@ ${JSON.stringify(fallbackItems)}
           renderIcons(modalApiGuide);
         });
       }
-      const unlockAudioHandler = () => {
+      const keepAudioUnlocked = () => {
         notifications.unlockAudio();
-        window.removeEventListener("click", unlockAudioHandler);
-        window.removeEventListener("touchstart", unlockAudioHandler);
       };
-      window.addEventListener("click", unlockAudioHandler, { passive: true });
-      window.addEventListener("touchstart", unlockAudioHandler, { passive: true });
+      window.addEventListener("click", keepAudioUnlocked, { passive: true });
+      window.addEventListener("touchstart", keepAudioUnlocked, { passive: true });
       const testApiBtn = document.getElementById("btn-test-api");
       if (testApiBtn) {
         testApiBtn.addEventListener("click", () => this.handleTestApiKey());

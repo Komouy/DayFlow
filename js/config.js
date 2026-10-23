@@ -21,7 +21,7 @@ export const APP_CONFIG = {
   DEFAULT_MODEL: 'gemini-2.5-flash',
 
   // Version identifier
-  VERSION: '6.2.0'
+  VERSION: '6.3.0'
 };
 
 // Allow runtime override via global window object or localStorage for testing

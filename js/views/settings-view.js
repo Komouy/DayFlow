@@ -49,6 +49,11 @@ export const settingsViewMethods = {
     if (soundToggle) soundToggle.checked = settings.soundEnabled !== false;
     if (toneSelect) toneSelect.value = settings.soundTone || 'crystal';
     if (proactiveToggle) proactiveToggle.checked = settings.proactiveReminders !== false;
+    const systemNotifToggle = document.getElementById('setting-system-notif');
+    if (systemNotifToggle) systemNotifToggle.checked = settings.systemNotificationsEnabled !== false;
+
+    // Sync Notification Permission Badge & Controls
+    this.updateNotificationPermissionUI();
 
     const themeRadio = document.querySelector(`input[name="setting-theme"][value="${settings.theme || 'dark'}"]`);
     if (themeRadio) themeRadio.checked = true;
@@ -72,6 +77,9 @@ export const settingsViewMethods = {
 
     // Sync Profile & Hero Banner Settings
     this.renderBannerSettings(settings);
+
+    // Sync Profile Productivity & Daily Rekap
+    this.renderProfileProductivity();
 
     // Sync Flexible Categories Preview
     this.renderSettingsCategoriesPreview();
@@ -104,6 +112,8 @@ export const settingsViewMethods = {
     const bannerUrlInput = document.getElementById('setting-banner-url');
     const bannerEnabledToggle = document.getElementById('setting-banner-enabled');
 
+    const systemNotifToggle = document.getElementById('setting-system-notif');
+
     state.updateSettings({
       userName: userNameInput ? userNameInput.value.trim() : '',
       heroBannerEnabled: bannerEnabledToggle ? bannerEnabledToggle.checked : false,
@@ -116,6 +126,7 @@ export const settingsViewMethods = {
       soundEnabled: soundToggle ? soundToggle.checked : true,
       soundTone: selectedTone,
       proactiveReminders: proactiveToggle ? proactiveToggle.checked : true,
+      systemNotificationsEnabled: systemNotifToggle ? systemNotifToggle.checked : true,
       theme: themeValue
     });
 
@@ -199,6 +210,7 @@ export const settingsViewMethods = {
       schedules: state.schedules,
       notes: state.notes,
       categories: state.getCategories(),
+      dailyLogs: state.dailyLogs,
       settings: { ...state.settings, apiKey: '' } // don't export plain secret
     };
 
@@ -228,6 +240,9 @@ export const settingsViewMethods = {
         }
         if (parsed.categories && Array.isArray(parsed.categories)) {
           localStorage.setItem('dayflow_categories_v1', JSON.stringify(parsed.categories));
+        }
+        if (parsed.dailyLogs && Array.isArray(parsed.dailyLogs)) {
+          localStorage.setItem('dayflow_daily_logs_v1', JSON.stringify(parsed.dailyLogs));
         }
         if (parsed.settings && typeof parsed.settings === 'object' && !Array.isArray(parsed.settings)) {
           const currentSettings = state.getSettings();
@@ -264,5 +279,126 @@ export const settingsViewMethods = {
     });
 
     previewEl.innerHTML = html;
+  },
+
+  updateNotificationPermissionUI() {
+    const badge = document.getElementById('notif-permission-badge');
+    const desc = document.getElementById('notif-permission-desc');
+    const actionRow = document.getElementById('notif-permission-action-row');
+    const enableBtn = document.getElementById('btn-enable-system-notif');
+    const statusText = document.getElementById('notif-action-status-text');
+
+    const perm = notifications.getPermissionStatus();
+
+    if (badge) {
+      if (perm === 'granted') {
+        badge.style.background = 'rgba(34, 197, 94, 0.12)';
+        badge.style.color = '#22c55e';
+        badge.style.borderColor = 'rgba(34, 197, 94, 0.25)';
+        badge.textContent = '● Aktif & Disetujui';
+        if (actionRow) actionRow.style.display = 'none';
+        if (desc) desc.textContent = 'DayFlow memiliki izin penuh untuk memunculkan pop-up jadwal di layar dan status bar peramban.';
+      } else if (perm === 'denied') {
+        badge.style.background = 'rgba(239, 68, 68, 0.12)';
+        badge.style.color = '#ef4444';
+        badge.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+        badge.textContent = '● Diblokir Browser';
+        if (actionRow) actionRow.style.display = 'flex';
+        if (enableBtn) enableBtn.style.display = 'none';
+        if (statusText) statusText.innerHTML = 'Izin notifikasi diblokir browser. Klik ikon gembok pada bilah URL, lalu ubah <b>Notifikasi</b> menjadi <b>Izinkan</b>.';
+        if (desc) desc.textContent = 'Browser memblokir pop-up notifikasi. Silakan buka izin pada bilah alamat web.';
+      } else if (perm === 'unsupported') {
+        badge.style.background = 'rgba(148, 163, 184, 0.12)';
+        badge.style.color = '#94a3b8';
+        badge.style.borderColor = 'rgba(148, 163, 184, 0.25)';
+        badge.textContent = '● Tidak Didukung';
+        if (actionRow) actionRow.style.display = 'none';
+        if (desc) desc.textContent = 'Peramban ini tidak mendukung Web Notifications API standar.';
+      } else {
+        // default / belum diizinkan
+        badge.style.background = 'rgba(245, 158, 11, 0.12)';
+        badge.style.color = '#f59e0b';
+        badge.style.borderColor = 'rgba(245, 158, 11, 0.25)';
+        badge.textContent = '● Belum Diaktifkan';
+        if (actionRow) actionRow.style.display = 'flex';
+        if (enableBtn) {
+          enableBtn.style.display = 'inline-flex';
+        }
+        if (statusText) statusText.textContent = 'Klik "Izinkan Notifikasi" agar pengingat agenda harian bisa tampil di luar peramban.';
+      }
+      renderIcons(actionRow || document);
+    }
+  },
+
+  renderProfileProductivity() {
+    const card = document.getElementById('profile-productivity-card');
+    if (!card) return;
+
+    const settings = state.getSettings();
+    const stats = state.getProfileProductivityStats();
+    const nameEl = document.getElementById('profile-card-name');
+    if (nameEl) {
+      nameEl.textContent = settings.userName ? `Profil ${escapeHtml(settings.userName)}` : 'Profil Pengguna';
+    }
+
+    const statInputted = document.getElementById('stat-today-inputted');
+    const statCompleted = document.getElementById('stat-today-completed');
+    const statPercent = document.getElementById('stat-today-percent');
+    const statStreak = document.getElementById('stat-perfect-streak');
+
+    if (statInputted) statInputted.textContent = stats.todayTotal;
+    if (statCompleted) statCompleted.textContent = stats.todayCompleted;
+    if (statPercent) statPercent.textContent = `${stats.todayPercent}%`;
+    if (statStreak) statStreak.textContent = stats.perfectDays;
+
+    // Render Daily History List
+    const historyList = document.getElementById('profile-history-list');
+    if (!historyList) return;
+
+    const logs = state.getDailyLogs(10);
+    if (!logs || logs.length === 0) {
+      historyList.innerHTML = `
+        <div class="profile-history-empty text-xs text-muted" style="padding: 12px 0;">
+          Belum ada riwayat tercatat. Rekap hari ini akan tersimpan otomatis setiap pukul 24:00.
+        </div>
+      `;
+      return;
+    }
+
+    let html = '';
+    logs.forEach(log => {
+      const isToday = log.date === getLocalDateString();
+      const dateObj = new Date(log.date + 'T00:00:00');
+      const dateLabel = isToday
+        ? 'Hari Ini'
+        : dateObj.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+
+      let badgeClass = 'badge-muted';
+      let badgeText = 'Istirahat';
+      if (log.totalScheduled > 0) {
+        if (log.percentage === 100) {
+          badgeClass = 'badge-success';
+          badgeText = '100% Tuntas';
+        } else {
+          badgeClass = 'badge-warning';
+          badgeText = `${log.completedCount}/${log.totalScheduled} Selesai`;
+        }
+      }
+
+      html += `
+        <div class="profile-history-item ${isToday ? 'is-today' : ''}">
+          <div class="profile-history-info">
+            <span class="profile-history-date tabular-nums">${escapeHtml(dateLabel)}</span>
+            <span class="profile-history-badge ${badgeClass}">${badgeText}</span>
+          </div>
+          <div class="profile-history-track">
+            <div class="profile-history-fill ${log.percentage === 100 ? 'is-perfect' : ''}" style="width: ${log.percentage}%;"></div>
+          </div>
+          <span class="profile-history-percent tabular-nums font-mono">${log.percentage}%</span>
+        </div>
+      `;
+    });
+
+    historyList.innerHTML = html;
   }
 };

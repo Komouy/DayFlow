@@ -32,15 +32,19 @@ class AppController {
     this._settingsAlertTimer = null;
 
     // Assign global references immediately to guarantee zero-latency button response
+    this.state = state;
+    window.dayflowState = state;
     window.dayflowApp = this;
     window._actualDayflowApp = this;
   }
 
   init() {
     try {
+      this.mountModals();
       this.applyTheme(state.getSettings().theme || 'dark');
       this.setupThemeListener();
       notifications.init();
+      this.initRealtimeClock();
       this.bindEvents();
       this.render();
       window.__dayflow_ready = true;
@@ -245,11 +249,16 @@ class AppController {
       });
     });
 
-    // Request notification permission button
+    // Header bell button: interactive test and permission toggle
     const notifBtn = document.getElementById('btn-request-notif');
     if (notifBtn) {
-      notifBtn.addEventListener('click', () => {
-        notifications.requestPermission();
+      notifBtn.addEventListener('click', async () => {
+        springBounce(notifBtn);
+        const tone = state.getSettings().soundTone || 'crystal';
+        await notifications.testNotification(tone);
+        if (typeof this.updateNotificationPermissionUI === 'function') {
+          this.updateNotificationPermissionUI();
+        }
       });
     }
 
@@ -257,8 +266,9 @@ class AppController {
     const testAudioBtn = document.getElementById('btn-test-chime');
     if (testAudioBtn) {
       testAudioBtn.addEventListener('click', () => {
+        springBounce(testAudioBtn);
         const toneInput = document.getElementById('setting-sound-tone');
-        const selectedTone = toneInput ? toneInput.value : 'crystal';
+        const selectedTone = toneInput ? toneInput.value : (state.getSettings().soundTone || 'crystal');
         notifications.playChime(selectedTone);
         const toneNames = {
           crystal: 'Crystal Bell',
@@ -266,7 +276,33 @@ class AppController {
           digital: 'Digital Pulse'
         };
         const name = toneNames[selectedTone] || 'Crystal Bell';
-        notifications.showToast(`Bel akustik (${name}) diputar.`, 'info');
+        notifications.showToast(`Bel akustik (${name}) berbunyi.`, 'info');
+      });
+    }
+
+    // Complete notification test (system popup + chime sound + vibration)
+    const testSystemNotifBtn = document.getElementById('btn-test-system-notif');
+    if (testSystemNotifBtn) {
+      testSystemNotifBtn.addEventListener('click', async () => {
+        springBounce(testSystemNotifBtn);
+        const toneInput = document.getElementById('setting-sound-tone');
+        const selectedTone = toneInput ? toneInput.value : (state.getSettings().soundTone || 'crystal');
+        await notifications.testNotification(selectedTone);
+        if (typeof this.updateNotificationPermissionUI === 'function') {
+          this.updateNotificationPermissionUI();
+        }
+      });
+    }
+
+    // Enable system notification button in Settings
+    const enableNotifBtn = document.getElementById('btn-enable-system-notif');
+    if (enableNotifBtn) {
+      enableNotifBtn.addEventListener('click', async () => {
+        springBounce(enableNotifBtn);
+        await notifications.requestPermission();
+        if (typeof this.updateNotificationPermissionUI === 'function') {
+          this.updateNotificationPermissionUI();
+        }
       });
     }
 
@@ -306,7 +342,6 @@ class AppController {
       });
     });
 
-
     // API Key Guide Modal trigger
     const openApiGuideBtn = document.getElementById('btn-open-api-guide');
     const modalApiGuide = document.getElementById('modal-api-guide');
@@ -318,14 +353,12 @@ class AppController {
       });
     }
 
-    // AudioContext unlock on first user gesture (for mobile browsers)
-    const unlockAudioHandler = () => {
+    // Continuous audio unlocking: keep AudioContext alive across user interactions
+    const keepAudioUnlocked = () => {
       notifications.unlockAudio();
-      window.removeEventListener('click', unlockAudioHandler);
-      window.removeEventListener('touchstart', unlockAudioHandler);
     };
-    window.addEventListener('click', unlockAudioHandler, { passive: true });
-    window.addEventListener('touchstart', unlockAudioHandler, { passive: true });
+    window.addEventListener('click', keepAudioUnlocked, { passive: true });
+    window.addEventListener('touchstart', keepAudioUnlocked, { passive: true });
 
     // Test API key connection button
     const testApiBtn = document.getElementById('btn-test-api');

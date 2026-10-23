@@ -45,7 +45,8 @@ export default async function handler(request) {
     });
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  const apiKey = rawKey.trim().replace(/^["'`]|["'`]$/g, '').trim();
   if (!apiKey) {
     return new Response(JSON.stringify({
       error: { message: 'GEMINI_API_KEY environment variable belum dikonfigurasi di Vercel.' }

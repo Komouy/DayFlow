@@ -57,6 +57,26 @@ Aturan penting tag [DAYFLOW_SCHEDULES]:
 - Jika item berupa tugas bertenggat (deadline/pengumpulan/submit), isi "deadline" ("YYYY-MM-DD") dan set "priority": "high".
 - Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
 - JANGAN PERNAH menambahkan kegiatan fiktif/pengisi (seperti istirahat/persiapan) yang tidak diminta!
+
+10. AKSI PEMBUATAN CATATAN OTOMATIS (ACTIONABLE NOTE EXECUTION):
+Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi/foto papan tulis/notula rapat yang cocok disimpan sebagai catatan:
+- Sertakan blok JSON catatan terstruktur di dalam tag:
+[DAYFLOW_NOTE]
+{
+  "title": "Judul Catatan Ringkas (3-6 kata)",
+  "content": "Isi rangkuman catatan lengkap dalam format markdown bersih (gunakan bullet points, ringkasan, atau action items)..."
+}
+[/DAYFLOW_NOTE]
+
+11. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
+Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah, silabus, foto papan tulis/catatan, poster event, atau screenshot kalender) atau berkas dokumen (PDF, TXT, CSV, ICS):
+- Teliti dan analisis seluruh teks dan informasi visual yang tertera di dalamnya secara cermat.
+- JIKA BERISI JADWAL/ACARA/DEADLINE:
+  * Jelaskan ringkasan agenda yang ditemukan secara lugas dan ramah.
+  * WAJIB sertakan tag [DAYFLOW_SCHEDULES] berisi semua kegiatan yang valid agar pengguna bisa langsung menyimpannya ke agenda dalam 1 klik.
+- JIKA BERISI RINGKASAN MATERI/NOTULA/CATATAN TUGAS:
+  * Berikan penjelasan penting.
+  * WAJIB sertakan tag [DAYFLOW_NOTE] agar pengguna bisa langsung menyimpannya ke Catatan DayFlow dalam 1 klik.
 `;
 
 export class GeminiService {
@@ -207,40 +227,58 @@ export class GeminiService {
   }
 
   /**
-   * General Chat with Gemini
+   * General Chat with Gemini (Supports Multimodal Image & Document Attachments)
    */
-  static async sendChatMessage(userText) {
+  static async sendChatMessage(userText, attachment = null) {
     const systemPrompt = this.buildSystemPrompt();
-    const rawHistory = state.getChatHistory().slice(-10);
+    
+    // The user's input message was already recorded into state.getChatHistory() right before calling sendChatMessage
+    const allHistory = state.getChatHistory();
+    let historyToUse = allHistory;
+    let currentTurnText = typeof userText === 'string' ? userText.trim() : '';
 
-    // Filter valid messages and map to Gemini roles ('user' or 'model')
-    const mapped = [];
+    if (allHistory.length > 0 && allHistory[allHistory.length - 1].role === 'user') {
+      const lastMsg = allHistory[allHistory.length - 1];
+      historyToUse = allHistory.slice(0, -1);
+      if (!currentTurnText) {
+        currentTurnText = lastMsg.text;
+      }
+    }
+
+    // If text document attachment is present, prepend its structured content
+    if (attachment && attachment.textContent) {
+      const docHeader = `[DOKUMEN TERLAMPIR: ${attachment.name || 'Dokumen'}]\n${attachment.textContent}\n[/DOKUMEN TERLAMPIR]\n\n`;
+      currentTurnText = `${docHeader}${currentTurnText || 'Tolong analisis isi dokumen ini dan bantu susunkan jadwal kegiatan atau catatan pentingnya.'}`;
+    }
+
+    // Default prompt if user submitted image without typing text or default label
+    if ((!currentTurnText || currentTurnText.startsWith('Lampiran:')) && attachment && attachment.base64) {
+      currentTurnText = 'Tolong analisis gambar/dokumen terlampir ini secara menyeluruh, jelaskan informasi jadwal/catatan penting yang tertera, dan buatkan jadwal kegiatan dalam tag [DAYFLOW_SCHEDULES] bila relevan.';
+    }
+
+    if (!currentTurnText) {
+      currentTurnText = 'Halo';
+    }
+
+    // Process past history messages (up to 10 previous turns)
+    const rawHistory = historyToUse.slice(-10);
+    const normalizedTurns = [];
+
     rawHistory.forEach(msg => {
       if (!msg) return;
       const text = typeof msg.text === 'string' ? msg.text.trim() : '';
       if (!text) return;
       const role = (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user';
-      mapped.push({ role, text });
-    });
 
-    // If userText isn't already the last turn in mapped, append it
-    const lastMapped = mapped[mapped.length - 1];
-    if (!lastMapped || lastMapped.role !== 'user' || lastMapped.text !== userText.trim()) {
-      mapped.push({ role: 'user', text: userText.trim() });
-    }
-
-    // Collapse consecutive turns of the same role (prevents Gemini 400 alternating turns error)
-    const normalizedTurns = [];
-    for (const item of mapped) {
-      if (normalizedTurns.length > 0 && normalizedTurns[normalizedTurns.length - 1].role === item.role) {
-        normalizedTurns[normalizedTurns.length - 1].parts[0].text += `\n\n${item.text}`;
+      if (normalizedTurns.length > 0 && normalizedTurns[normalizedTurns.length - 1].role === role) {
+        normalizedTurns[normalizedTurns.length - 1].parts[0].text += `\n\n${text}`;
       } else {
         normalizedTurns.push({
-          role: item.role,
-          parts: [{ text: item.text }]
+          role: role,
+          parts: [{ text: text }]
         });
       }
-    }
+    });
 
     // Gemini requires the first turn in contents to be 'user'
     if (normalizedTurns.length > 0 && normalizedTurns[0].role === 'model') {
@@ -250,11 +288,33 @@ export class GeminiService {
       });
     }
 
-    // Fallback if somehow empty
-    if (normalizedTurns.length === 0) {
+    // Prepare active turn with attachment parts (GUARANTEED ATTACHMENT INCLUSION)
+    const activeParts = [];
+    if (attachment && attachment.base64 && attachment.mimeType) {
+      activeParts.push({
+        inlineData: {
+          mimeType: attachment.mimeType,
+          data: attachment.base64
+        }
+      });
+    }
+    activeParts.push({ text: currentTurnText });
+
+    // Append to contents: merge if last turn was already user, otherwise push new turn
+    if (normalizedTurns.length > 0 && normalizedTurns[normalizedTurns.length - 1].role === 'user') {
+      if (attachment && attachment.base64 && attachment.mimeType) {
+        normalizedTurns[normalizedTurns.length - 1].parts.unshift({
+          inlineData: {
+            mimeType: attachment.mimeType,
+            data: attachment.base64
+          }
+        });
+      }
+      normalizedTurns[normalizedTurns.length - 1].parts[normalizedTurns[normalizedTurns.length - 1].parts.length - 1].text += `\n\n${currentTurnText}`;
+    } else {
       normalizedTurns.push({
         role: 'user',
-        parts: [{ text: userText.trim() || 'Halo' }]
+        parts: activeParts
       });
     }
 

@@ -67,7 +67,8 @@ export default {
     }
 
     // 4. Verify Server Secret Configuration
-    const apiKey = env.GEMINI_API_KEY ? env.GEMINI_API_KEY.trim() : '';
+    const rawKey = env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '';
+    const apiKey = rawKey.trim().replace(/^["'`]|["'`]$/g, '').trim();
     if (!apiKey) {
       return new Response(JSON.stringify({
         error: {
@@ -127,7 +128,7 @@ export default {
           lastError = { status, message: errMsg, model: currentModel };
 
           // If client authentication error, don't retry other models
-          if (status === 400 || status === 403) {
+          if (status === 400 || status === 401 || status === 403) {
             return new Response(JSON.stringify(resData), {
               status: status,
               headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }

@@ -4,7 +4,7 @@
  * Zero-hang, immediate redeploy visibility guarantee.
  */
 
-const CACHE_NAME = 'dayflow-v6.6';
+const CACHE_NAME = 'dayflow-v6.9';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -13,8 +13,12 @@ const ASSETS_TO_CACHE = [
   '/css/tokens.css',
   '/css/style.v5.css',
   '/css/style.css',
+  '/js/early-bootstrap.js',
+  '/js/components/modal-templates.js',
   '/js/bundle.v5.js',
   '/js/bundle.js',
+  '/js/app.js',
+  '/js/notifications.js',
   '/js/config.js',
   '/js/icons.js',
   '/icons/icon.svg',

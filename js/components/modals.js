@@ -9,9 +9,15 @@ import { notifications } from '../notifications.js';
 import { springBounce, shakeElement } from '../animations.js';
 import { escapeHtml, formatMarkdown, generateScheduleText, generateGoogleCalendarUrl, generateIcsFileContent } from '../utils/helpers.js';
 import { GeminiService } from '../gemini.js';
+import { mountModals } from './modal-templates.js';
 
 export const modalMethods = {
+  mountModals() {
+    mountModals();
+  },
+
   openScheduleModal(scheduleId = null) {
+    this.mountModals();
     this.closeAllModals();
     this.editingScheduleId = scheduleId;
     const modal = document.getElementById('modal-schedule');
@@ -143,6 +149,7 @@ export const modalMethods = {
   },
 
   openNoteModal(noteId = null) {
+    this.mountModals();
     this.closeAllModals();
     this.editingNoteId = noteId;
     const modal = document.getElementById('modal-note');
@@ -232,6 +239,7 @@ export const modalMethods = {
   },
 
   openCategoryModal(onCreatedCallback = null) {
+    this.mountModals();
     const modal = document.getElementById('modal-category');
     if (!modal) return;
 
@@ -355,6 +363,7 @@ export const modalMethods = {
   },
 
   openShareModal(targetDate = null) {
+    this.mountModals();
     this.closeAllModals();
     const modal = document.getElementById('modal-share-schedule');
     if (!modal) return;
@@ -461,6 +470,7 @@ export const modalMethods = {
   },
 
   openApiGuideModal() {
+    this.mountModals();
     const modal = document.getElementById('modal-api-guide');
     if (modal) {
       modal.classList.add('open');

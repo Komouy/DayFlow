@@ -2196,6 +2196,178 @@ select.input-control option {
   outline: none;
 }
 
+/* Floating Attachment Preview Bar */
+.chat-attachment-preview {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  animation: slideDownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chat-attachment-preview.hidden {
+  display: none !important;
+}
+
+.attachment-preview-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface-elevated, #1c1d22);
+  border: 1px solid var(--border-medium, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 8px);
+  padding: 6px 10px 6px 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  max-width: 100%;
+}
+
+.attachment-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.attachment-doc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(249, 115, 22, 0.12);
+  color: var(--accent-primary, #f97316);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  max-width: 200px;
+}
+
+.attachment-filename {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.attachment-filesize {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.btn-cancel-attach {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 4px;
+}
+
+.btn-cancel-attach:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-danger, #ef4444);
+}
+
+/* Chat Bubble Attachment Views */
+.chat-bubble-attachment {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-attachment-img {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.chat-attachment-img:hover {
+  transform: scale(1.02);
+}
+
+.chat-attachment-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* Chat Note Card (Actionable AI Extracted Note) */
+.chat-note-card {
+  margin-top: 10px;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-md, 8px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-note-title-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.chat-note-body {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chat-note-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.chat-note-saved-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--status-success);
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
 .quick-prompts {
   display: flex;
   gap: var(--space-2);
@@ -4425,4 +4597,366 @@ button.btn-add-category-pill {
 .ai-quick-strip:active {
   transform: scale(0.98);
 }
+
+/* ==========================================================================
+   DayFlow Schedule Dynamic Progress Bar & Profile Rekap (Anti-Slop Standard)
+   Curated Warm Amber Tokens, Tabular Typography, Responsive Linearity
+   ========================================================================== */
+
+/* 1. Today Schedule Progress Bar Widget */
+.today-progress-widget {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: var(--space-4, 16px);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--duration-fast) var(--ease-snappy);
+}
+
+.today-progress-widget:hover {
+  border-color: var(--border-hover);
+}
+
+.today-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.today-progress-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.today-progress-icon-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: rgba(234, 88, 12, 0.12);
+  color: var(--accent-primary, #ea580c);
+  border: 1px solid rgba(234, 88, 12, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.today-progress-text-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.today-progress-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.today-progress-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.today-progress-pill-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background-color: rgba(234, 88, 12, 0.14);
+  color: var(--accent-primary, #ea580c);
+  border: 1px solid rgba(234, 88, 12, 0.28);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.today-progress-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.today-progress-countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm, 6px);
+  font-variant-numeric: tabular-nums;
+}
+
+.today-progress-track-wrap {
+  width: 100%;
+}
+
+.today-progress-track {
+  width: 100%;
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border-subtle);
+}
+
+[data-theme="light"] .today-progress-track {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.today-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #ea580c 0%, #f97316 60%, #fbbf24 100%);
+  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.today-progress-fill.is-complete {
+  background: linear-gradient(90deg, #10b981 0%, #22c55e 100%);
+}
+
+.today-progress-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.25) 50%, transparent 100%);
+  animation: dfProgressShimmer 2.2s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes dfProgressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.today-progress-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.today-progress-status-note {
+  flex: 1;
+  min-width: 180px;
+  line-height: 1.4;
+}
+
+.today-progress-streak-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #10b981;
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* 2. Profile Productivity Card */
+.profile-productivity-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-header-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-color: rgba(234, 88, 12, 0.12);
+  color: var(--accent-primary, #ea580c);
+  border: 1px solid rgba(234, 88, 12, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .profile-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.profile-stat-box {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm, 6px);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-stat-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.profile-stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.profile-history-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.profile-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile-history-item {
+  display: grid;
+  grid-template-columns: 140px 1fr 45px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 6px);
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+
+@media (max-width: 480px) {
+  .profile-history-item {
+    grid-template-columns: 110px 1fr 40px;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+}
+
+.profile-history-item.is-today {
+  border-color: rgba(234, 88, 12, 0.35);
+  background-color: rgba(234, 88, 12, 0.04);
+}
+
+.profile-history-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.profile-history-date {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.profile-history-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.profile-history-badge.badge-success {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.profile-history-badge.badge-warning {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.profile-history-badge.badge-muted {
+  background-color: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.profile-history-track {
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+[data-theme="light"] .profile-history-track {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+
+.profile-history-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background-color: var(--accent-primary, #ea580c);
+  transition: width 300ms ease;
+}
+
+.profile-history-fill.is-perfect {
+  background-color: #10b981;
+}
+
+.profile-history-percent {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
 

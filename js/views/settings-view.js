@@ -87,12 +87,31 @@ export const settingsViewMethods = {
 
   updateModelPickerUI(modelId = 'gemini-2.5-flash') {
     const hiddenInput = document.getElementById('setting-model');
-    if (hiddenInput) hiddenInput.value = 'gemini-2.5-flash';
+    if (hiddenInput) hiddenInput.value = modelId;
 
     const nameEl = document.getElementById('current-model-name');
     const descEl = document.getElementById('current-model-desc');
-    if (nameEl) nameEl.textContent = 'Gemini 2.5 Flash';
-    if (descEl) descEl.textContent = 'Respon luas, penalaran terperinci & hemat kuota token';
+    const modelMeta = {
+      'gemini-2.5-flash': {
+        name: 'Gemini 2.5 Flash',
+        desc: 'Respon luas, penalaran terperinci & hemat kuota token'
+      },
+      'gemini-3.5-flash-lite': {
+        name: 'Gemini 3.5 Flash-Lite',
+        desc: 'Eksekusi instan, latensi rendah & respons super cepat'
+      },
+      'gemini-3.6-flash': {
+        name: 'Gemini 3.6 Flash',
+        desc: 'Keseimbangan performa tinggi & penalaran mendalam'
+      },
+      'gemini-3.8-flash': {
+        name: 'Gemini 3.8 Flash',
+        desc: 'Model cerdas generasi terbaru'
+      }
+    };
+    const current = modelMeta[modelId] || { name: modelId, desc: 'Model AI terkonfigurasi' };
+    if (nameEl) nameEl.textContent = current.name;
+    if (descEl) descEl.textContent = current.desc;
   },
 
   handleSaveSettings(e) {

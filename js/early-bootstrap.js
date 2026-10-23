@@ -7,7 +7,7 @@
 if ('caches' in window) {
   caches.keys().then(function(keys) {
     keys.forEach(function(k) {
-      if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v6.9') {
+      if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v7.0') {
         console.log('[DayFlow] Purging obsolete cache:', k);
         caches.delete(k);
       }

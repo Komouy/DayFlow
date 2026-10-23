@@ -314,12 +314,33 @@ class StateManager {
     if (Array.isArray(this.schedules)) {
       const prevSchedCount = this.schedules.length;
       this.schedules = this.schedules.filter(s => {
-        if (!s) return false;
+        if (!s || typeof s !== 'object') return false;
         if (s.id && DUMMY_SCHEDULE_IDS.includes(s.id)) return false;
-        const lowerTitle = (s.title || '').trim().toLowerCase();
+        const rawTitle = String(s.title || '').trim();
+        const lowerTitle = rawTitle.toLowerCase();
         if (DUMMY_SCHEDULE_TITLES.includes(lowerTitle)) return false;
+
+        // Auto-purge parser artifacts and garbage items (e.g. '" " Null', '"time" " "', empty or json token titles)
+        if (/^["'\s]*(?:null|time|undefined|date|duration|category|recurrence|deadline|priority|description|notes)["'\s]*$/i.test(rawTitle)) return false;
+        if (/^["'\s]*null["'\s]*$/i.test(rawTitle)) return false;
+        if (rawTitle === '"" Null' || rawTitle === '" " Null' || rawTitle === 'Null' || rawTitle === '"time" " "') return false;
+        if (rawTitle.length < 2) return false;
         return true;
       });
+
+      // Auto-clean leftover pipe characters in titles like "Literasi Digital | | Ruangan 4S 1"
+      this.schedules.forEach(s => {
+        if (s && s.title && s.title.includes('|')) {
+          const parts = s.title.split('|').map(p => p.trim()).filter(Boolean);
+          if (parts.length > 0) {
+            s.title = parts[0];
+            if (parts.length > 1 && !s.description) {
+              s.description = parts.slice(1).join(' - ');
+            }
+          }
+        }
+      });
+
       if (this.schedules.length !== prevSchedCount) {
         this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
       }
@@ -568,8 +589,26 @@ class StateManager {
   addSchedule(scheduleData) {
     if (!scheduleData || typeof scheduleData !== 'object') return null;
 
-    const rawTitle = scheduleData.title || scheduleData.kegiatan || scheduleData.activity || scheduleData.task || scheduleData.name || 'Kegiatan Baru';
-    const safeTitle = String(rawTitle).trim() || 'Kegiatan Baru';
+    let rawTitle = scheduleData.title || scheduleData.kegiatan || scheduleData.activity || scheduleData.task || scheduleData.name || '';
+    rawTitle = String(rawTitle).trim();
+
+    // Guard against corrupted JSON parser tokens
+    if (/^["'\s]*(?:null|time|undefined|date|duration|category|recurrence|deadline|priority|description|notes)["'\s]*$/i.test(rawTitle) ||
+        /^["'\s]*null["'\s]*$/i.test(rawTitle) ||
+        rawTitle === '"" Null' || rawTitle === '" " Null' || rawTitle === 'Null' || rawTitle === '"time" " "' || rawTitle.length < 2) {
+      return null;
+    }
+
+    // Clean pipes if present in title
+    let safeDescription = (typeof scheduleData.description === 'string' ? scheduleData.description : (scheduleData.deskripsi || scheduleData.notes || scheduleData.catatan || '')).trim();
+    if (rawTitle.includes('|')) {
+      const parts = rawTitle.split('|').map(p => p.trim()).filter(Boolean);
+      rawTitle = parts[0] || 'Kegiatan Baru';
+      if (parts.length > 1 && !safeDescription) {
+        safeDescription = parts.slice(1).join(' - ');
+      }
+    }
+    const safeTitle = rawTitle || 'Kegiatan Baru';
     const safeDate = normalizeDateString(scheduleData.date);
     const safeTime = normalizeTimeString(scheduleData.time);
 
@@ -579,7 +618,7 @@ class StateManager {
       time: safeTime,
       duration: Math.max(5, parseInt(scheduleData.duration || scheduleData.durasi, 10) || 30),
       title: safeTitle,
-      description: (typeof scheduleData.description === 'string' ? scheduleData.description : (scheduleData.deskripsi || scheduleData.notes || scheduleData.catatan || '')).trim(),
+      description: safeDescription,
       category: (scheduleData.category && typeof scheduleData.category === 'string') ? scheduleData.category.trim() : (scheduleData.kategori || 'Fokus'),
       priority: ['low', 'medium', 'high'].includes(scheduleData.priority) ? scheduleData.priority : 'medium',
       deadline: scheduleData.deadline ? normalizeDateString(scheduleData.deadline) : null,
@@ -604,8 +643,26 @@ class StateManager {
 
     schedulesArray.forEach((item, index) => {
       if (!item || typeof item !== 'object') return;
-      const rawTitle = item.title || item.kegiatan || item.activity || item.task || item.name || 'Kegiatan Baru';
-      const safeTitle = String(rawTitle).trim() || 'Kegiatan Baru';
+      let rawTitle = item.title || item.kegiatan || item.activity || item.task || item.name || '';
+      rawTitle = String(rawTitle).trim();
+
+      // Guard against corrupted JSON parser tokens
+      if (/^["'\s]*(?:null|time|undefined|date|duration|category|recurrence|deadline|priority|description|notes)["'\s]*$/i.test(rawTitle) ||
+          /^["'\s]*null["'\s]*$/i.test(rawTitle) ||
+          rawTitle === '"" Null' || rawTitle === '" " Null' || rawTitle === 'Null' || rawTitle === '"time" " "' || rawTitle.length < 2) {
+        return;
+      }
+
+      // Clean pipes if present in title
+      let safeDescription = (typeof item.description === 'string' ? item.description : (item.deskripsi || item.notes || item.catatan || '')).trim();
+      if (rawTitle.includes('|')) {
+        const parts = rawTitle.split('|').map(p => p.trim()).filter(Boolean);
+        rawTitle = parts[0] || 'Kegiatan Baru';
+        if (parts.length > 1 && !safeDescription) {
+          safeDescription = parts.slice(1).join(' - ');
+        }
+      }
+      const safeTitle = rawTitle || 'Kegiatan Baru';
       const safeDate = normalizeDateString(item.date);
       const safeTime = normalizeTimeString(item.time);
 
@@ -615,7 +672,7 @@ class StateManager {
         time: safeTime,
         duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
         title: safeTitle,
-        description: (typeof item.description === 'string' ? item.description : (item.deskripsi || item.notes || item.catatan || '')).trim(),
+        description: safeDescription,
         category: (item.category && typeof item.category === 'string') ? item.category.trim() : (item.kategori || 'Fokus'),
         priority: ['low', 'medium', 'high'].includes(item.priority) ? item.priority : 'medium',
         deadline: item.deadline ? normalizeDateString(item.deadline) : null,

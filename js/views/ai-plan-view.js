@@ -33,10 +33,31 @@ export const aiPlanViewMethods = {
     const items = [];
     const deadlineKeywords = /\b(?:deadline|tenggat|paling\s+lambat|harus\s+kumpul|kumpul(?:kan)?(?:\s+tugas)?|submit|due\s+date|maksimal|harus\s+kelar|harus\s+selesai|pengumpulan)\b/i;
 
+    let currentContextDate = targetDate || today;
+
     for (let chunk of rawChunks) {
       if (!chunk || chunk.length < 3) continue;
 
-      let itemDate = targetDate || today;
+      // Filter out raw JSON lines or token fragments from being parsed as schedules
+      if (/^\s*(?:\[|\{|\}|\]|"[^"]+"\s*:|,\s*$)/.test(chunk)) continue;
+
+      // Check if chunk is a day header (e.g. "1. Senin:", "Senin:", "Hari Selasa:", "Jadwal Rabu:")
+      const dayHeaderMatch = chunk.match(/^\s*(?:\d+[\s.)-]+\s*)?(?:jadwal\s+)?(?:hari\s+)?(senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\s*[:\-]?\s*$/i);
+      if (dayHeaderMatch) {
+        const dayMap = { 'minggu': 0, 'senin': 1, 'selasa': 2, 'rabu': 3, 'kamis': 4, 'jumat': 5, "jum'at": 5, 'sabtu': 6 };
+        const dayIdx = dayMap[dayHeaderMatch[1].toLowerCase()];
+        if (dayIdx !== undefined) {
+          const nowObj = new Date();
+          let diff = dayIdx - nowObj.getDay();
+          if (diff <= 0) diff += 7;
+          const targetDay = new Date(nowObj);
+          targetDay.setDate(targetDay.getDate() + diff);
+          currentContextDate = getLocalDateString(targetDay);
+          continue; // Header captured; apply date to subsequent items
+        }
+      }
+
+      let itemDate = currentContextDate;
       const lower = chunk.toLowerCase();
       const indMonths = {
         januari: '01', jan: '01', februari: '02', feb: '02', maret: '03', mar: '03', april: '04', apr: '04',
@@ -186,14 +207,29 @@ export const aiPlanViewMethods = {
         recurrence = 'monthly';
       }
 
-      // Infer category
-      let category = isDeadline ? 'Kerja' : 'Fokus';
-      if (/kesehatan|olahraga|jogging|lari|gym|sehat|tidur|istirahat|meditasi/i.test(chunk)) category = 'Kesehatan';
-      else if (/kerja|kantor|meeting|rapat|proyek|klien|tugas|evaluasi|koding|coding|skripsi|laporan|magang|revisi|kuliah|matkul|ddp|kampus|dosen/i.test(chunk)) category = 'Kerja';
-      else if (/pribadi|makan|sarapan|santai|keluarga|hobi|belanja|jalan|nonton|film|bioskop/i.test(chunk)) category = 'Pribadi';
+      // Extract location or note for description (handles "Ruangan 4D.6", "Lab 2", etc.)
+      let description = '';
+      const locMatch = chunk.match(/(?:📍|\blengkap\s+di\b|\blokasi\s*[:\-]?\s*|\btempat\s*[:\-]?\s*|\bruang(?:an)?\s*[:\-]?\s*|\bgedung\s*[:\-]?\s*|\blantai\s*[:\-]?\s*)([^,;|\n]+)/i);
+      if (locMatch) {
+        description = locMatch[0].trim();
+      } else if (/selesai|tuntas|done/i.test(chunk)) {
+        description = 'Berlangsung s/d selesai';
+      }
 
       // Auto-paraphrase title
       let title = chunk;
+
+      // Handle piped lines like "Kalkulus | 12:30 - 14:10 | Ruangan 4D.6"
+      if (title.includes('|')) {
+        const pipeParts = title.split('|').map(p => p.trim()).filter(Boolean);
+        if (pipeParts.length > 0) {
+          title = pipeParts[0];
+          if (pipeParts.length >= 3 && !description) {
+            description = pipeParts[2];
+          }
+        }
+      }
+
       // Strip emojis
       title = title.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{2300}-\u{23FF}]/gu, ' ');
       // Strip bullets, list numbers
@@ -216,30 +252,32 @@ export const aiPlanViewMethods = {
       // Strip relative dates and day names from title
       title = title.replace(/\b(?:besok(?:\s+pagi|\s+siang|\s+sore|\s+malam)?|lusa|hari\s+ini|semalam)\b/gi, '');
       title = title.replace(/\b(?:hari\s+)?(?:senin|selasa|rabu|kamis|jumat|jum'at|sabtu|minggu)\b/gi, '');
+      // Strip location already captured in description
+      if (description) {
+        title = title.replace(new RegExp(description.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi'), ' ');
+      }
       // Strip conversational suffixes
       title = title.replace(/\b(?:ya|yah|dong|deh|nih|sih|pliss?|please|oke|ok|gas|gasken)\b/gi, '');
-      // Strip remaining symbols and excessive spaces
+      // Strip remaining symbols including pipes and quotes
       title = title.replace(/\((?:[^)]*)\)/g, '').replace(/\[(?:[^\]]*)\]/g, '');
-      title = title.replace(/[:\-–—.,;!?]+/g, ' ').replace(/\s+/g, ' ').trim();
+      title = title.replace(/[|:\-–—.,;!?"]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+      // Guard against parser tokens or garbage title
+      if (!title || /^["'\s]*(?:null|time|undefined|date|duration|category|recurrence|deadline|priority|description|notes)["'\s]*$/i.test(title) || title === 'Null' || title.length < 2) {
+        continue;
+      }
 
       // Title capitalization
-      if (title.length >= 2) {
-        title = title.split(' ')
-          .filter(Boolean)
-          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ');
-      } else {
-        title = isDeadline ? 'Kumpul Tugas Bertenggat' : 'Kegiatan Terjadwal';
-      }
+      title = title.split(' ')
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
 
-      // Extract location or note for description
-      let description = '';
-      const locMatch = chunk.match(/(?:📍|\blengkap\s+di\b|\blokasi\s*[:\-]?\s*|\btempat\s*[:\-]?\s*|\bruang(?:an)?\s*[:\-]?\s*)([^,;\n]+)/i);
-      if (locMatch) {
-        description = locMatch[1].trim();
-      } else if (/selesai|tuntas|done/i.test(chunk)) {
-        description = 'Berlangsung s/d selesai';
-      }
+      // Infer category
+      let category = isDeadline ? 'Kerja' : 'Fokus';
+      if (/kesehatan|olahraga|jogging|lari|gym|sehat|tidur|istirahat|meditasi/i.test(chunk)) category = 'Kesehatan';
+      else if (/kerja|kantor|meeting|rapat|proyek|klien|tugas|evaluasi|koding|coding|skripsi|laporan|magang|revisi|kuliah|matkul|ddp|kampus|dosen|kalkulus|literasi|pancasila|filsafat|pemrograman|akidah|informatika/i.test(chunk)) category = 'Fokus';
+      else if (/pribadi|makan|sarapan|santai|keluarga|hobi|belanja|jalan|nonton|film|bioskop/i.test(chunk)) category = 'Pribadi';
 
       items.push({
         title: title,
@@ -267,50 +305,126 @@ export const aiPlanViewMethods = {
     let cleanText = rawText;
     let schedules = [];
 
-    // 1. Check for explicit [DAYFLOW_SCHEDULES] tag
-    const tagMatch = rawText.match(/\[DAYFLOW_SCHEDULES\]([\s\S]*?)\[\/DAYFLOW_SCHEDULES\]/i);
-    if (tagMatch) {
-      try {
-        let jsonStr = tagMatch[1].trim();
-        jsonStr = jsonStr.replace(/```json/gi, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(jsonStr);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const categories = state.getCategories();
-          const todayDate = getLocalDateString();
-          schedules = parsed.map(item => {
-            const rawCat = (item.category || item.kategori || 'Kerja').trim();
-            const foundCat = categories.find(c => c.name.toLowerCase() === rawCat.toLowerCase());
-            const finalCat = foundCat ? foundCat.name : (['Kerja', 'Fokus', 'Pribadi', 'Kesehatan'].includes(rawCat) ? rawCat : 'Kerja');
-
-            const rawRec = String(item.recurrence || item.perulangan || '').toLowerCase().trim();
-            const validRec = ['none', 'daily', 'weekdays', 'weekly', 'monthly'];
-            const finalRec = validRec.includes(rawRec) ? rawRec : 'none';
-
-            let cleanDeadline = null;
-            if (item.deadline && typeof item.deadline === 'string' && item.deadline.trim() && item.deadline !== 'null') {
-              cleanDeadline = normalizeDateString(item.deadline, todayDate);
-            }
-
-            return {
-              title: String(item.title || item.kegiatan || 'Kegiatan Baru').trim(),
-              description: String(item.description || item.deskripsi || item.notes || item.catatan || '').trim(),
-              date: normalizeDateString(item.date, todayDate),
-              time: normalizeTimeString(item.time),
-              duration: Math.max(5, parseInt(item.duration, 10) || 30),
-              category: finalCat,
-              recurrence: finalRec,
-              deadline: cleanDeadline,
-              priority: ['high', 'medium', 'low'].includes(item.priority) ? item.priority : (cleanDeadline ? 'high' : 'medium'),
-              reminder: item.reminder !== false
-            };
-          });
-        }
-      } catch (err) {
-        console.warn('Failed parsing [DAYFLOW_SCHEDULES] tag:', err);
+    // 1. Check for explicit [DAYFLOW_SCHEDULES] tag (even if unclosed or truncated)
+    const hasTagStart = /\[DAYFLOW_SCHEDULES\]/i.test(rawText);
+    if (hasTagStart) {
+      let jsonPart = '';
+      const closedMatch = rawText.match(/\[DAYFLOW_SCHEDULES\]([\s\S]*?)\[\/DAYFLOW_SCHEDULES\]/i);
+      if (closedMatch) {
+        jsonPart = closedMatch[1];
+        cleanText = rawText.replace(/\[DAYFLOW_SCHEDULES\][\s\S]*?\[\/DAYFLOW_SCHEDULES\]/gi, '').trim();
+      } else {
+        // Tag was opened but unclosed (e.g. token truncation)
+        const parts = rawText.split(/\[DAYFLOW_SCHEDULES\]/i);
+        cleanText = (parts[0] || '').trim();
+        jsonPart = parts[1] || '';
       }
-      cleanText = rawText.replace(/\[DAYFLOW_SCHEDULES\][\s\S]*?\[\/DAYFLOW_SCHEDULES\]/gi, '').trim();
+
+      // Strip code block backticks
+      jsonPart = jsonPart.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+      let parsed = null;
+      // Try 1: standard JSON.parse
+      try {
+        parsed = JSON.parse(jsonPart);
+      } catch (e1) {
+        // Try 2: If truncated array, trim trailing comma and close bracket
+        try {
+          let trimmed = jsonPart.replace(/,\s*$/, '').trim();
+          if (trimmed.startsWith('[') && !trimmed.endsWith(']')) {
+            parsed = JSON.parse(trimmed + ']');
+          }
+        } catch (e2) {}
+      }
+
+      // Try 3: Object-by-object regex matcher to salvage every complete object
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        parsed = [];
+        const objectRegex = /\{[\s\S]*?"(?:title|kegiatan)"\s*:\s*"[^"]+"[\s\S]*?\}/g;
+        let m;
+        while ((m = objectRegex.exec(jsonPart)) !== null) {
+          try {
+            const single = JSON.parse(m[0]);
+            if (single && (single.title || single.kegiatan)) {
+              parsed.push(single);
+            }
+          } catch (e3) {
+            // Lenient regex fallback per object
+            try {
+              const tM = m[0].match(/"(?:title|kegiatan)"\s*:\s*"([^"]+)"/i);
+              const dM = m[0].match(/"date"\s*:\s*"([^"]+)"/i);
+              const timeM = m[0].match(/"time"\s*:\s*"([^"]+)"/i);
+              const durM = m[0].match(/"duration"\s*:\s*(\d+)/i);
+              const descM = m[0].match(/"(?:description|deskripsi|notes)"\s*:\s*"([^"]*)"/i);
+              const recM = m[0].match(/"(?:recurrence|perulangan)"\s*:\s*"([^"]+)"/i);
+              const catM = m[0].match(/"(?:category|kategori)"\s*:\s*"([^"]+)"/i);
+              if (tM && tM[1]) {
+                parsed.push({
+                  title: tM[1],
+                  date: dM ? dM[1] : null,
+                  time: timeM ? timeM[1] : '09:00',
+                  duration: durM ? parseInt(durM[1], 10) : 30,
+                  description: descM ? descM[1] : '',
+                  recurrence: recM ? recM[1] : 'none',
+                  category: catM ? catM[1] : 'Fokus'
+                });
+              }
+            } catch (e4) {}
+          }
+        }
+      }
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const categories = state.getCategories();
+        const todayDate = getLocalDateString();
+        schedules = parsed.map(item => {
+          if (!item || typeof item !== 'object') return null;
+          let rawTitle = String(item.title || item.kegiatan || '').trim();
+
+          // Discard parser tokens and garbage
+          if (/^["'\s]*(?:null|time|undefined|date|duration|category|recurrence|deadline|priority|description|notes)["'\s]*$/i.test(rawTitle) ||
+              rawTitle === '"" Null' || rawTitle === '" " Null' || rawTitle === 'Null' || rawTitle === '"time" " "' || rawTitle.length < 2) {
+            return null;
+          }
+
+          let safeDesc = String(item.description || item.deskripsi || item.notes || item.catatan || '').trim();
+          if (rawTitle.includes('|')) {
+            const parts = rawTitle.split('|').map(p => p.trim()).filter(Boolean);
+            rawTitle = parts[0] || 'Kegiatan Baru';
+            if (parts.length > 1 && !safeDesc) {
+              safeDesc = parts.slice(1).join(' - ');
+            }
+          }
+
+          const rawCat = (item.category || item.kategori || 'Kerja').trim();
+          const foundCat = categories.find(c => c.name.toLowerCase() === rawCat.toLowerCase());
+          const finalCat = foundCat ? foundCat.name : (['Kerja', 'Fokus', 'Pribadi', 'Kesehatan'].includes(rawCat) ? rawCat : 'Kerja');
+
+          const rawRec = String(item.recurrence || item.perulangan || '').toLowerCase().trim();
+          const validRec = ['none', 'daily', 'weekdays', 'weekly', 'monthly'];
+          const finalRec = validRec.includes(rawRec) ? rawRec : 'none';
+
+          let cleanDeadline = null;
+          if (item.deadline && typeof item.deadline === 'string' && item.deadline.trim() && item.deadline !== 'null') {
+            cleanDeadline = normalizeDateString(item.deadline, todayDate);
+          }
+
+          return {
+            title: rawTitle,
+            description: safeDesc,
+            date: normalizeDateString(item.date, todayDate),
+            time: normalizeTimeString(item.time),
+            duration: Math.max(5, parseInt(item.duration, 10) || 30),
+            category: finalCat,
+            recurrence: finalRec,
+            deadline: cleanDeadline,
+            priority: ['high', 'medium', 'low'].includes(item.priority) ? item.priority : (cleanDeadline ? 'high' : 'medium'),
+            reminder: item.reminder !== false
+          };
+        }).filter(Boolean);
+      }
     } else {
-      // 2. Fallback check: Did assistant output bullet points with explicit time?
+      // 2. Fallback check: ONLY when [DAYFLOW_SCHEDULES] was never generated by the model
       const fallbackItems = this.extractSchedulesFromText(rawText);
       if (fallbackItems && fallbackItems.length > 0) {
         const hasExplicitTime = fallbackItems.some(item => item.time !== '09:00' || item.duration !== 30);
@@ -747,15 +861,30 @@ export const aiPlanViewMethods = {
 
         let scheduleCardHtml = '';
         if (schedules.length > 0) {
+          const uniqueDates = [...new Set(schedules.map(s => s.date).filter(Boolean))].sort();
           const targetDate = schedules[0].date || getLocalDateString();
-          const displayDate = new Date(targetDate + 'T00:00:00').toLocaleDateString('id-ID', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short'
-          });
+          let displayDate = '';
+          if (uniqueDates.length === 1) {
+            displayDate = new Date(uniqueDates[0] + 'T00:00:00').toLocaleDateString('id-ID', {
+              weekday: 'short',
+              day: 'numeric',
+              month: 'short'
+            });
+          } else if (uniqueDates.length > 1) {
+            const firstDate = new Date(uniqueDates[0] + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' });
+            const lastDate = new Date(uniqueDates[uniqueDates.length - 1] + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+            displayDate = `${firstDate} – ${lastDate} (${uniqueDates.length} Hari)`;
+          } else {
+            displayDate = 'Hari Ini';
+          }
 
           const itemsHtml = schedules.map(item => {
             let badgesHtml = '';
+
+            // Day pill if schedules span across multiple dates (e.g. weekly university timetable)
+            const itemDayBadge = uniqueDates.length > 1 && item.date
+              ? `<span style="font-size:10px; font-weight:600; color:var(--text-secondary); padding:1px 6px; border-radius:4px; background:rgba(255,255,255,0.06); font-family:var(--font-mono);">${new Date(item.date + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'short' })}</span>`
+              : '';
 
             // Recurrence badge
             if (item.recurrence && item.recurrence !== 'none') {
@@ -779,6 +908,7 @@ export const aiPlanViewMethods = {
 
             return `
               <div class="chat-schedule-item-row" style="flex-wrap:wrap; align-items:flex-start;">
+                ${itemDayBadge}
                 <span class="chat-schedule-item-time tabular-nums">${item.time}</span>
                 <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
                   <span class="chat-schedule-item-title">${escapeHtml(item.title)}</span>

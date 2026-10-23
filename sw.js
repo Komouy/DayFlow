@@ -1,10 +1,10 @@
 /**
- * DayFlow Service Worker v6.6
+ * DayFlow Service Worker v7.0
  * Resilient Network-First for HTML Navigation & Instant Cache for Static Assets.
  * Zero-hang, immediate redeploy visibility guarantee.
  */
 
-const CACHE_NAME = 'dayflow-v6.9';
+const CACHE_NAME = 'dayflow-v7.0';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

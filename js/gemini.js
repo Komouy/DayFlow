@@ -69,11 +69,17 @@ Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi
 [/DAYFLOW_NOTE]
 
 11. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
-Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah, silabus, foto papan tulis/catatan, poster event, atau screenshot kalender) atau berkas dokumen (PDF, TXT, CSV, ICS):
+Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akademik, silabus, foto papan tulis/catatan, poster event, atau screenshot kalender) atau berkas dokumen (PDF, TXT, CSV, ICS):
 - Teliti dan analisis seluruh teks dan informasi visual yang tertera di dalamnya secara cermat.
 - JIKA BERISI JADWAL/ACARA/DEADLINE:
-  * Jelaskan ringkasan agenda yang ditemukan secara lugas dan ramah.
-  * WAJIB sertakan tag [DAYFLOW_SCHEDULES] berisi semua kegiatan yang valid agar pengguna bisa langsung menyimpannya ke agenda dalam 1 klik.
+  * Jelaskan ringkasan agenda yang ditemukan secara lugas, rapi, dan terstruktur.
+  * WAJIB sertakan tag [DAYFLOW_SCHEDULES] berisi SEMUA kegiatan yang valid.
+  * Untuk jadwal kuliah mingguan (Senin, Selasa, Rabu, Kamis, Jumat):
+    - Berikan "date" sesuai tanggal hari tersebut pada minggu berjalan atau terdekat (YYYY-MM-DD).
+    - Set "recurrence": "weekly".
+    - "title": Tuliskan nama mata kuliah/kegiatan bersih tanpa simbol aneh (contoh: "Kuliah Kalkulus", "Kuliah Literasi Digital").
+    - "description": Masukkan detail ruangan/lokasi (contoh: "Ruangan 4D.6", "Ruangan 4S.1").
+    - "duration": Hitung selisih jam mulai hingga selesai dalam menit (contoh 12:30 - 14:10 = 100 menit).
 - JIKA BERISI RINGKASAN MATERI/NOTULA/CATATAN TUGAS:
   * Berikan penjelasan penting.
   * WAJIB sertakan tag [DAYFLOW_NOTE] agar pengguna bisa langsung menyimpannya ke Catatan DayFlow dalam 1 klik.
@@ -326,7 +332,7 @@ export class GeminiService {
       generationConfig: {
         temperature: 0.4,
         topP: 0.85,
-        maxOutputTokens: 1000
+        maxOutputTokens: 4096
       }
     };
 

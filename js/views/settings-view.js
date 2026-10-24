@@ -133,13 +133,7 @@ export const settingsViewMethods = {
     if (hiddenInput && hiddenInput.value !== modelId) hiddenInput.value = modelId;
 
     const descEl = document.getElementById('current-model-desc');
-    const modelMeta = {
-      'gemini-2.5-flash': 'Hemat kuota & penalaran luas',
-      'gemini-3.5-flash-lite': 'Latensi rendah & respons super cepat',
-      'gemini-3.6-flash': 'Keseimbangan performa tinggi & penalaran mendalam',
-      'gemini-3.8-flash': 'Model cerdas generasi terbaru'
-    };
-    if (descEl) descEl.textContent = modelMeta[modelId] || 'Rekomendasi Bawaan';
+    if (descEl) descEl.textContent = 'Penalaran jadwal presisi, hemat kuota token & latensi rendah';
   },
 
   handleSaveSettings(e) {

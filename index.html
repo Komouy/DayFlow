@@ -690,17 +690,28 @@
             <div id="ai-panel-gemini" class="ai-provider-panel">
               <div class="settings-column">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                  <label for="setting-model" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:0;">
+                  <span class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:0;">
                     Model Gemini
-                  </label>
-                  <span class="text-xs text-muted" id="current-model-desc">Rekomendasi Bawaan</span>
+                  </span>
+                  <span class="model-option-badge" style="background-color:var(--accent-primary-soft); color:var(--accent-primary); border-color:var(--accent-primary-border); font-size:10.5px; padding:2px 8px;">
+                    Hemat Kuota &amp; Stabil
+                  </span>
                 </div>
-                <select id="setting-model" class="input-control" style="font-size:13px; font-family:var(--font-sans); cursor:pointer;">
-                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Hemat kuota & penalaran luas)</option>
-                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Latensi rendah & respons cepat)</option>
-                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (Penalaran seimbang)</option>
-                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Model cerdas generasi terbaru)</option>
-                </select>
+                <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:var(--accent-primary-soft); color:var(--accent-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                      <span data-icon="bot" data-icon-size="16"></span>
+                    </div>
+                    <div>
+                      <div style="font-size:13px; font-weight:700; color:var(--text-primary); font-family:var(--font-mono);">Gemini 2.5 Flash</div>
+                      <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;" id="current-model-desc">
+                        Penalaran jadwal presisi, hemat kuota token &amp; latensi rendah
+                      </div>
+                    </div>
+                  </div>
+                  <span data-icon="check" data-icon-size="15" style="color:var(--status-success); flex-shrink:0;"></span>
+                </div>
+                <input type="hidden" id="setting-model" value="gemini-2.5-flash">
               </div>
 
               <!-- Collapsible API Key Pribadi Gemini -->
@@ -726,30 +737,60 @@
 
             <!-- Panel Groq (GroqCloud & xAI) -->
             <div id="ai-panel-groq" class="ai-provider-panel hidden">
-              <div class="settings-column">
-                <label for="setting-groq-api-key" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">
-                  Groq / xAI API Key
-                </label>
-                <div class="form-group" style="position:relative; display:flex; align-items:center; margin-bottom:6px;">
-                  <input type="password" id="setting-groq-api-key" class="input-control" placeholder="gsk_... (GroqCloud) atau xai-... (xAI)" autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
-                  <button type="button" id="btn-toggle-groq-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:36px; width:36px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan Key" title="Tampilkan/Sembunyikan Key">
-                    <span data-icon="eye" data-icon-size="15"></span>
-                  </button>
+              <div class="settings-column" style="margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:0;">
+                    Model Groq
+                  </span>
+                  <span class="model-option-badge" style="background-color:rgba(14, 165, 233, 0.12); color:#0ea5e9; border-color:rgba(14, 165, 233, 0.25); font-size:10.5px; padding:2px 8px;">
+                    LPU Ultra-Cepat
+                  </span>
                 </div>
-                <span class="settings-row-desc" style="font-size:11px; margin-bottom:8px;">
-                  Mendukung GroqCloud (Llama 3.3 70B LPU) dan xAI Grok. Terdeteksi otomatis dari awalan kunci.
-                </span>
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                  <button type="button" class="btn btn-secondary btn-xs" id="btn-test-groq-api" style="font-size:12px;">
-                    <span data-icon="zap" data-icon-size="12"></span>
-                    Uji Koneksi Groq
-                  </button>
-                  <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-groq-api-key" style="font-size:11.5px; color:var(--status-danger);" title="Hapus Groq Key">
-                    <span data-icon="trash" data-icon-size="12"></span>
-                    Hapus Key
-                  </button>
+                <div style="background:var(--bg-surface-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:32px; height:32px; border-radius:var(--radius-sm); background:rgba(14, 165, 233, 0.12); color:#0ea5e9; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                      <span data-icon="zap" data-icon-size="16"></span>
+                    </div>
+                    <div>
+                      <div style="font-size:13px; font-weight:700; color:var(--text-primary); font-family:var(--font-mono);">Llama 3.3 70B Versatile</div>
+                      <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">
+                        Eksekusi instan di Groq LPU, hemat token &amp; keluaran JSON terstruktur
+                      </div>
+                    </div>
+                  </div>
+                  <span data-icon="check" data-icon-size="15" style="color:var(--status-success); flex-shrink:0;"></span>
                 </div>
+                <input type="hidden" id="setting-groq-model" value="llama-3.3-70b-versatile">
               </div>
+
+              <!-- Collapsible API Key Pribadi Groq -->
+              <details class="settings-developer-details" style="border-top:1px solid var(--border-subtle); padding-top:8px;">
+                <summary style="font-size:12px; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;">
+                  <span data-icon="key" data-icon-size="13"></span>
+                  <span>Gunakan Groq API Key Pribadi (Opsional)</span>
+                </summary>
+                <div style="margin-top:8px;">
+                  <div class="form-group" style="position:relative; display:flex; align-items:center; margin-bottom:6px;">
+                    <input type="password" id="setting-groq-api-key" class="input-control" placeholder="gsk_... (GroqCloud) atau xai-... (xAI)" autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
+                    <button type="button" id="btn-toggle-groq-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:36px; width:36px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan Key" title="Tampilkan/Sembunyikan Key">
+                      <span data-icon="eye" data-icon-size="15"></span>
+                    </button>
+                  </div>
+                  <span class="settings-row-desc" style="font-size:11px; margin-bottom:8px; display:block;">
+                    Mendukung GroqCloud (gsk_...) dan xAI (xai-...). Kosongkan jika memakai gateway Cloudflare.
+                  </span>
+                  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary btn-xs" id="btn-test-groq-api" style="font-size:12px;">
+                      <span data-icon="zap" data-icon-size="12"></span>
+                      Uji Koneksi Groq
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-groq-api-key" style="font-size:11.5px; color:var(--status-danger);" title="Hapus Groq Key">
+                      <span data-icon="trash" data-icon-size="12"></span>
+                      Hapus Key
+                    </button>
+                  </div>
+                </div>
+              </details>
             </div>
 
             <!-- Footer Aksi AI -->

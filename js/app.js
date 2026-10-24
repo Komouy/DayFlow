@@ -381,7 +381,7 @@ class AppController {
 
     // Model selection change
     const modelSelect = document.getElementById('setting-model');
-    if (modelSelect) {
+    if (modelSelect && modelSelect.tagName === 'SELECT') {
       modelSelect.addEventListener('change', () => {
         const modelId = modelSelect.value;
         state.updateSettings({ geminiModel: modelId });

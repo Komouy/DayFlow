@@ -28,7 +28,7 @@ export const settingsViewMethods = {
     if (providerInput) providerInput.value = provider;
     if (apiInput) apiInput.value = settings.apiKey || '';
     if (groqInput) groqInput.value = settings.groqApiKey || settings.grokApiKey || '';
-    if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || 'gemini-2.5-flash';
+    if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || 'gemini-3.5-flash-lite';
     if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
 
     // Sync AI Provider Switcher UI & Active Panels
@@ -116,7 +116,7 @@ export const settingsViewMethods = {
     });
 
     // Sync Model descriptions
-    this.updateModelPickerUI(settings.geminiModel || 'gemini-2.5-flash');
+    this.updateModelPickerUI(settings.geminiModel || 'gemini-3.5-flash-lite');
 
     // Sync Profile & Hero Banner Settings
     this.renderBannerSettings(settings);
@@ -128,12 +128,12 @@ export const settingsViewMethods = {
     this.renderSettingsCategoriesPreview();
   },
 
-  updateModelPickerUI(modelId = 'gemini-2.5-flash') {
+  updateModelPickerUI(modelId = 'gemini-3.5-flash-lite') {
     const hiddenInput = document.getElementById('setting-model');
     if (hiddenInput && hiddenInput.value !== modelId) hiddenInput.value = modelId;
 
     const descEl = document.getElementById('current-model-desc');
-    if (descEl) descEl.textContent = 'Penalaran jadwal presisi, hemat kuota token & latensi rendah';
+    if (descEl) descEl.textContent = 'Rekomendasi Google: Tercepat, paling irit token & bebas batas kuota';
   },
 
   handleSaveSettings(e) {
@@ -169,7 +169,7 @@ export const settingsViewMethods = {
       apiKey: apiInput ? apiInput.value.trim() : '',
       groqApiKey: groqKey,
       grokApiKey: groqKey,
-      geminiModel: modelSelect ? modelSelect.value : 'gemini-2.5-flash',
+      geminiModel: modelSelect ? modelSelect.value : 'gemini-3.5-flash-lite',
       notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : '15', 10) || 15,
       soundEnabled: soundToggle ? soundToggle.checked : true,
       soundTone: selectedTone,
@@ -227,7 +227,7 @@ export const settingsViewMethods = {
       if (apiKey) {
         // Test user's personal key
         const res = await GeminiService.testConnection(apiKey);
-        state.updateSettings({ apiKey, geminiModel: res.model || 'gemini-2.5-flash' });
+        state.updateSettings({ apiKey, geminiModel: res.model || 'gemini-3.5-flash-lite' });
         this.renderSettingsView();
         notifications.showToast(`Gemini API Key pribadi valid & aktif! (${res.model})`, 'success', 5000);
       } else if (GeminiService.isAiReady()) {

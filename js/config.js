@@ -17,8 +17,8 @@ export const APP_CONFIG = {
   // Optional: Centralized Shared API Key (Used as fallback if proxy URL is not set yet)
   CENTRAL_API_KEY: '',
 
-  // Default Gemini Intelligence Model (Token-efficient & broad answers)
-  DEFAULT_MODEL: 'gemini-2.5-flash',
+  // Default Gemini Intelligence Model (Token-efficient & budget-friendly)
+  DEFAULT_MODEL: 'gemini-3.5-flash-lite',
 
   // Groq / xAI Fallback & Direct Configuration
   GROQ_API_URL: 'https://api.groq.com/openai/v1/chat/completions',

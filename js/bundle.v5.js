@@ -243,7 +243,7 @@
   var DEFAULT_SETTINGS = {
     userName: "",
     apiKey: "",
-    geminiModel: "gemini-2.5-flash",
+    geminiModel: "gemini-3.5-flash-lite",
     notifyAdvanceMinutes: 15,
     soundEnabled: true,
     soundTone: "crystal",
@@ -333,8 +333,8 @@
       }
       const loadedSettings = this._load(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS) || {};
       this.settings = { ...DEFAULT_SETTINGS, ...loadedSettings };
-      if (this.settings.geminiModel !== "gemini-2.5-flash") {
-        this.settings.geminiModel = "gemini-2.5-flash";
+      if (this.settings.geminiModel !== "gemini-3.5-flash-lite") {
+        this.settings.geminiModel = "gemini-3.5-flash-lite";
         this._save(STORAGE_KEYS.SETTINGS, this.settings);
       }
       if (!this.settings.hasConfiguredBanner) {
@@ -1887,8 +1887,8 @@ ${message}`));
     AI_PROXY_URL: "https://dayflow.dhavinal20.workers.dev",
     // Optional: Centralized Shared API Key (Used as fallback if proxy URL is not set yet)
     CENTRAL_API_KEY: "",
-    // Default Gemini Intelligence Model (Token-efficient & broad answers)
-    DEFAULT_MODEL: "gemini-2.5-flash",
+    // Default Gemini Intelligence Model (Token-efficient & budget-friendly)
+    DEFAULT_MODEL: "gemini-3.5-flash-lite",
     // Groq / xAI Fallback & Direct Configuration
     GROQ_API_URL: "https://api.groq.com/openai/v1/chat/completions",
     DEFAULT_GROQ_MODEL: "llama-3.3-70b-versatile",
@@ -2037,7 +2037,7 @@ Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan ke
       return Boolean(this.getProxyUrl() || this.getApiKey() || this.getGroqApiKey());
     }
     static getModel() {
-      return state.getSettings().geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.5-flash";
+      return state.getSettings().geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-3.5-flash-lite";
     }
     static buildSystemPrompt() {
       const todaySchedules = state.getTodaySchedules();
@@ -2188,7 +2188,7 @@ Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan ke
       };
       const executeGemini = async () => {
         const primaryModel = this.getModel();
-        const candidateModels = [primaryModel, "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"].filter((v, i, a) => a.indexOf(v) === i);
+        const candidateModels = [primaryModel, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash"].filter((v, i, a) => a.indexOf(v) === i);
         let lastGeminiErr = null;
         if (proxyUrl && !userPersonalKey) {
           for (const model of candidateModels) {
@@ -2534,7 +2534,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         generationConfig: { maxOutputTokens: 20 }
       };
       if (keyToTest && (customKey !== null || !proxyUrl)) {
-        const candidateModels = [this.getModel(), "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"].filter((v, i, a) => a.indexOf(v) === i);
+        const candidateModels = [this.getModel(), "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-2.5-flash"].filter((v, i, a) => a.indexOf(v) === i);
         for (const model of candidateModels) {
           const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(keyToTest)}`;
           try {
@@ -5912,7 +5912,7 @@ ${JSON.stringify(fallbackItems)}
       if (providerInput) providerInput.value = provider;
       if (apiInput) apiInput.value = settings.apiKey || "";
       if (groqInput) groqInput.value = settings.groqApiKey || settings.grokApiKey || "";
-      if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.5-flash";
+      if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-3.5-flash-lite";
       if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
       document.querySelectorAll("#ai-provider-switcher button").forEach((btn) => {
         const p = btn.getAttribute("data-provider");
@@ -5984,16 +5984,16 @@ ${JSON.stringify(fallbackItems)}
         const val = item.getAttribute("data-tone-val");
         item.classList.toggle("is-active", val === currentTone);
       });
-      this.updateModelPickerUI(settings.geminiModel || "gemini-2.5-flash");
+      this.updateModelPickerUI(settings.geminiModel || "gemini-3.5-flash-lite");
       this.renderBannerSettings(settings);
       this.renderProfileProductivity();
       this.renderSettingsCategoriesPreview();
     },
-    updateModelPickerUI(modelId = "gemini-2.5-flash") {
+    updateModelPickerUI(modelId = "gemini-3.5-flash-lite") {
       const hiddenInput = document.getElementById("setting-model");
       if (hiddenInput && hiddenInput.value !== modelId) hiddenInput.value = modelId;
       const descEl = document.getElementById("current-model-desc");
-      if (descEl) descEl.textContent = "Penalaran jadwal presisi, hemat kuota token & latensi rendah";
+      if (descEl) descEl.textContent = "Rekomendasi Google: Tercepat, paling irit token & bebas batas kuota";
     },
     handleSaveSettings(e) {
       e.preventDefault();
@@ -6025,7 +6025,7 @@ ${JSON.stringify(fallbackItems)}
         apiKey: apiInput ? apiInput.value.trim() : "",
         groqApiKey: groqKey,
         grokApiKey: groqKey,
-        geminiModel: modelSelect ? modelSelect.value : "gemini-2.5-flash",
+        geminiModel: modelSelect ? modelSelect.value : "gemini-3.5-flash-lite",
         notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : "15", 10) || 15,
         soundEnabled: soundToggle ? soundToggle.checked : true,
         soundTone: selectedTone,
@@ -6068,7 +6068,7 @@ ${JSON.stringify(fallbackItems)}
       try {
         if (apiKey) {
           const res = await GeminiService.testConnection(apiKey);
-          state.updateSettings({ apiKey, geminiModel: res.model || "gemini-2.5-flash" });
+          state.updateSettings({ apiKey, geminiModel: res.model || "gemini-3.5-flash-lite" });
           this.renderSettingsView();
           notifications.showToast(`Gemini API Key pribadi valid & aktif! (${res.model})`, "success", 5e3);
         } else if (GeminiService.isAiReady()) {

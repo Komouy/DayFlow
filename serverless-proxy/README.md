@@ -24,23 +24,31 @@ Arsitektur ini memungkinkan Anda menggunakan satu **Gemini API Key milik Anda se
 4. **Masukkan API Key Anda (Secret)**:
    - Kembali ke halaman pengaturan Worker (`Settings`).
    - Pilih tab **Variables and Secrets**.
-   - Di bagian *Secrets*, klik **Add**.
-   - Masukkan nama variabel: `GEMINI_API_KEY`
-   - Masukkan nilai API Key Gemini Anda (dari Google AI Studio).
+   - Di bagian *Secrets*, klik **Add**:
+     - `GEMINI_API_KEY`: Masukkan nilai API Key Gemini Anda (dari Google AI Studio).
+     - `GROK_API_KEY`: (Opsional / Sangat Direkomendasikan) Masukkan API Key xAI Grok untuk perlindungan fallback otomatis jika server Google Gemini penuh/sibuk.
    - Klik **Save and Deploy**.
+
+   *Atau melalui terminal (Wrangler CLI):*
+   ```bash
+   npx wrangler secret put GEMINI_API_KEY
+   npx wrangler secret put GROK_API_KEY
+   npx wrangler deploy
+   ```
+
 5. **Hubungkan ke DayFlow**:
-   - Salin URL worker Anda (contoh: `https://dayflow-ai-gateway.<username>.workers.dev`).
+   - Salin URL worker Anda (contoh: `https://dayflow.<username>.workers.dev`).
    - Buka file [js/config.js](file:///c:/Users/dhavi/Documents/ProyekAI/js/config.js) di proyek DayFlow.
    - Isi variabel `AI_PROXY_URL`:
      ```javascript
      export const APP_CONFIG = {
-       AI_PROXY_URL: 'https://dayflow-ai-gateway.<username>.workers.dev',
-       DEFAULT_MODEL: 'gemini-2.0-flash'
+       AI_PROXY_URL: 'https://dayflow.<username>.workers.dev',
+       DEFAULT_MODEL: 'gemini-2.5-flash'
      };
      ```
    - Jalankan `npm run build` dan deploy ke Firebase Hosting: `firebase deploy --only hosting`.
 
-Selesai! Sekarang semua pengguna DayFlow di seluruh dunia dapat langsung menikmati fitur AI tanpa perlu menginput API Key sama sekali.
+Selesai! Sekarang semua pengguna DayFlow di seluruh dunia dapat langsung menikmati fitur AI tanpa perlu menginput API Key sama sekali, lengkap dengan failover otomatis ke xAI Grok.
 
 ---
 

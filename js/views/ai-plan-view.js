@@ -213,7 +213,7 @@ export const aiPlanViewMethods = {
 
       // Extract location or note for description (handles "Ruangan 4D.6", "Lab 2", etc.)
       let description = '';
-      const locMatch = chunk.match(/(?:📍|\blengkap\s+di\b|\blokasi\s*[:\-]?\s*|\btempat\s*[:\-]?\s*|\bruang(?:an)?\s*[:\-]?\s*|\bgedung\s*[:\-]?\s*|\blantai\s*[:\-]?\s*)([^,;|\n]+)/i);
+      const locMatch = chunk.match(/(?:\blengkap\s+di\b|\blokasi\s*[:\-]?\s*|\btempat\s*[:\-]?\s*|\bruang(?:an)?\s*[:\-]?\s*|\bgedung\s*[:\-]?\s*|\blantai\s*[:\-]?\s*)([^,;|\n]+)/i);
       if (locMatch) {
         description = locMatch[0].trim();
       } else if (/selesai|tuntas|done/i.test(chunk)) {
@@ -766,6 +766,225 @@ export const aiPlanViewMethods = {
     }
   },
 
+  initChatSpeechRecognition() {
+    const micBtn = document.getElementById('btn-chat-mic');
+    const chatInput = document.getElementById('chat-input');
+    if (!micBtn || micBtn._hasMicHandler) return;
+    micBtn._hasMicHandler = true;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      micBtn.addEventListener('click', () => {
+        notifications.showToast('Fitur dikte suara tidak didukung oleh browser ini. Silakan ketik langsung di kolom chat.', 'info');
+      });
+      return;
+    }
+
+    let recognition = null;
+    let isListening = false;
+
+    const stopListening = () => {
+      isListening = false;
+      micBtn.classList.remove('is-listening');
+      micBtn.setAttribute('title', 'Dikte Suara (Bicara)');
+      if (recognition) {
+        try { recognition.stop(); } catch (e) {}
+      }
+    };
+
+    const startListening = () => {
+      try {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'id-ID';
+        recognition.interimResults = true;
+        recognition.continuous = false;
+
+        recognition.onstart = () => {
+          isListening = true;
+          micBtn.classList.add('is-listening');
+          micBtn.setAttribute('title', 'Mendengarkan... Bicara sekarang');
+          notifications.showToast('Mendengarkan... Silakan ucapkan rencanamu.', 'info', 2000);
+        };
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (chatInput && transcript) {
+            chatInput.value = transcript;
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.warn('Speech recognition error:', event.error);
+          stopListening();
+          if (event.error === 'not-allowed') {
+            notifications.showToast('Izin akses mikrofon ditolak oleh browser.', 'warning');
+          } else if (event.error !== 'no-speech') {
+            notifications.showToast('Gagal menangkap suara: ' + event.error, 'warning');
+          }
+        };
+
+        recognition.onend = () => {
+          stopListening();
+          if (chatInput && chatInput.value.trim()) {
+            chatInput.focus();
+          }
+        };
+
+        recognition.start();
+      } catch (err) {
+        console.error('Error starting speech recognition:', err);
+        stopListening();
+      }
+    };
+
+    micBtn.addEventListener('click', () => {
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    });
+  },
+
+  renderLiveContextBar() {
+    const bar = document.getElementById('chat-live-context-bar');
+    if (!bar) return;
+
+    const todayObj = new Date();
+    const formattedDate = todayObj.toLocaleDateString('id-ID', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    const todaySchedules = state.getTodaySchedules() || [];
+    const completedCount = todaySchedules.filter(s => s.completed).length;
+    const totalSchedules = todaySchedules.length;
+
+    // Determine upcoming item
+    const currentMinutes = todayObj.getHours() * 60 + todayObj.getMinutes();
+    let nextItem = null;
+    let minDiff = Infinity;
+
+    todaySchedules.forEach(item => {
+      if (!item.completed && item.time) {
+        const parts = item.time.split(':').map(Number);
+        const itemMins = (parts[0] || 0) * 60 + (parts[1] || 0);
+        if (itemMins >= currentMinutes && (itemMins - currentMinutes) < minDiff) {
+          minDiff = itemMins - currentMinutes;
+          nextItem = item;
+        }
+      }
+    });
+
+    let nextScheduleHtml = '';
+    if (nextItem) {
+      nextScheduleHtml = `
+        <div class="chat-context-pill pill-active" title="Kegiatan berikutnya hari ini">
+          ${getIcon('clock', '', 12)}
+          <span>Berikutnya: <strong class="tabular-nums">${nextItem.time}</strong> ${escapeHtml(nextItem.title)}</span>
+        </div>
+      `;
+    } else if (totalSchedules > 0 && completedCount === totalSchedules) {
+      nextScheduleHtml = `
+        <div class="chat-context-pill pill-success" title="Semua agenda hari ini telah selesai">
+          ${getIcon('check-circle', '', 12)}
+          <span>Semua agenda selesai</span>
+        </div>
+      `;
+    } else {
+      nextScheduleHtml = `
+        <div class="chat-context-pill" title="Jadwal hari ini fleksibel">
+          ${getIcon('clock', '', 12)}
+          <span>Waktu Luang Terbuka</span>
+        </div>
+      `;
+    }
+
+    const tasks = state.tasks || [];
+    const pendingTasks = tasks.filter(t => !t.completed).length;
+
+    bar.innerHTML = `
+      <div class="chat-context-pill" title="Hari dan Tanggal">
+        ${getIcon('calendar', '', 12)}
+        <span>${formattedDate}</span>
+      </div>
+      <div class="chat-context-pill" title="Progres Kegiatan Hari Ini">
+        ${getIcon('circle', '', 11)}
+        <span><strong class="tabular-nums">${completedCount}/${totalSchedules}</strong> Agenda</span>
+      </div>
+      ${nextScheduleHtml}
+      ${pendingTasks > 0 ? `
+        <div class="chat-context-pill" title="Tugas yang belum selesai">
+          ${getIcon('file-text', '', 12)}
+          <span><strong class="tabular-nums">${pendingTasks}</strong> Tugas Menunggu</span>
+        </div>
+      ` : ''}
+    `;
+
+    renderIcons(bar);
+  },
+
+  timeStringToMinutes(t) {
+    if (!t) return 0;
+    const parts = String(t).split(':').map(Number);
+    return (parts[0] || 0) * 60 + (parts[1] || 0);
+  },
+
+  minutesToTimeString(mins) {
+    const norm = ((mins % 1440) + 1440) % 1440;
+    const h = Math.floor(norm / 60).toString().padStart(2, '0');
+    const m = (norm % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  },
+
+  detectCandidateConflicts(candidateSchedules, targetDate) {
+    if (!Array.isArray(candidateSchedules) || candidateSchedules.length === 0) return [];
+    const dateToCheck = targetDate || getLocalDateString();
+    const existing = (state.getSchedules(dateToCheck) || []).filter(s => s && s.time);
+    if (existing.length === 0) return [];
+
+    const existingIntervals = existing.map(e => {
+      const start = this.timeStringToMinutes(e.time);
+      const dur = Math.max(5, parseInt(e.duration, 10) || 30);
+      return {
+        title: e.title || 'Agenda',
+        time: e.time,
+        start,
+        end: start + dur
+      };
+    });
+
+    const detected = [];
+
+    candidateSchedules.forEach((cand, idx) => {
+      if (!cand || !cand.time) return;
+      const cStart = this.timeStringToMinutes(cand.time);
+      const cDur = Math.max(5, parseInt(cand.duration, 10) || 30);
+      const cEnd = cStart + cDur;
+
+      for (const ex of existingIntervals) {
+        if (ex.start < cEnd && cStart < ex.end) {
+          detected.push({
+            candidateIdx: idx,
+            candidateTitle: cand.title || 'Kegiatan',
+            candidateTime: cand.time,
+            existingTitle: ex.title,
+            existingTime: ex.time,
+            conflictEndTime: ex.end
+          });
+          break;
+        }
+      }
+    });
+
+    return detected;
+  },
+
   setupChatDelegation(containerEl) {
     if (!containerEl || containerEl._hasChatDelegation) return;
     containerEl._hasChatDelegation = true;
@@ -773,6 +992,145 @@ export const aiPlanViewMethods = {
     containerEl.addEventListener('click', (e) => {
       const target = e.target;
       if (!target) return;
+
+      // Handle copy assistant message to clipboard
+      const copyBtn = target.closest('[data-action="copy-chat-msg"]');
+      if (copyBtn) {
+        e.stopPropagation();
+        const bubble = copyBtn.closest('.chat-bubble-assistant');
+        const contentEl = bubble ? bubble.querySelector('.chat-bubble-content') : null;
+        const textToCopy = contentEl ? contentEl.innerText.trim() : '';
+        if (textToCopy) {
+          navigator.clipboard.writeText(textToCopy).then(() => {
+            copyBtn.classList.add('is-copied');
+            const iconEl = copyBtn.querySelector('.action-icon');
+            const labelEl = copyBtn.querySelector('.action-label');
+            if (iconEl) iconEl.innerHTML = getIcon('check', '', 12);
+            if (labelEl) labelEl.textContent = 'Tersalin!';
+            notifications.showToast('Pesan berhasil disalin ke clipboard.', 'success', 1800);
+            setTimeout(() => {
+              copyBtn.classList.remove('is-copied');
+              if (iconEl) iconEl.innerHTML = getIcon('copy', '', 12);
+              if (labelEl) labelEl.textContent = 'Salin';
+            }, 1800);
+          }).catch(err => {
+            console.error('Clipboard copy failed:', err);
+            notifications.showToast('Gagal menyalin ke clipboard.', 'warning');
+          });
+        }
+        return;
+      }
+
+      // Handle regenerate response
+      const regenBtn = target.closest('[data-action="regenerate-chat-msg"]');
+      if (regenBtn) {
+        e.stopPropagation();
+        const msgId = regenBtn.getAttribute('data-msg-id');
+        const history = state.getChatHistory();
+        const msgIdx = history.findIndex(m => m.id === msgId || ('msg_idx_' + history.indexOf(m)) === msgId);
+        let lastUserMsg = null;
+        if (msgIdx !== -1) {
+          for (let i = msgIdx - 1; i >= 0; i--) {
+            if (history[i].role === 'user') {
+              lastUserMsg = history[i];
+              break;
+            }
+          }
+        }
+        if (!lastUserMsg) {
+          for (let i = history.length - 1; i >= 0; i--) {
+            if (history[i].role === 'user') {
+              lastUserMsg = history[i];
+              break;
+            }
+          }
+        }
+
+        if (lastUserMsg && lastUserMsg.text) {
+          notifications.showToast('Membuat ulang jawaban asisten AI...', 'info', 2000);
+          this.handleSendChatMessage(null, lastUserMsg.text);
+        } else {
+          notifications.showToast('Tidak ada pertanyaan sebelumnya untuk dibuat ulang.', 'warning');
+        }
+        return;
+      }
+
+      // Handle save assistant bubble as note
+      const saveBubbleNoteBtn = target.closest('[data-action="save-bubble-note"]');
+      if (saveBubbleNoteBtn) {
+        e.stopPropagation();
+        const bubble = saveBubbleNoteBtn.closest('.chat-bubble-assistant');
+        const contentEl = bubble ? bubble.querySelector('.chat-bubble-content') : null;
+        const textContent = contentEl ? contentEl.innerText.trim() : '';
+        if (textContent) {
+          const lines = textContent.split('\n').map(l => l.trim()).filter(Boolean);
+          const rawTitle = lines[0] ? lines[0].replace(/^[#*\-•\s]+/, '').slice(0, 40) : 'Catatan Asisten AI';
+          const title = rawTitle || 'Catatan Asisten AI';
+          state.addNote(title, textContent);
+          particleBurst(saveBubbleNoteBtn, 'var(--status-success)');
+          springBounce(saveBubbleNoteBtn);
+          notifications.playChime();
+          notifications.showToast('Tanggapan berhasil disimpan ke Catatan!', 'success');
+          saveBubbleNoteBtn.disabled = true;
+          saveBubbleNoteBtn.classList.add('is-copied');
+          const labelEl = saveBubbleNoteBtn.querySelector('.action-label');
+          if (labelEl) labelEl.textContent = 'Tersimpan';
+        }
+        return;
+      }
+
+      // Handle conflict auto-adjustment in chat schedule card
+      const resolveBtn = target.closest('[data-action="resolve-chat-conflict"]');
+      if (resolveBtn) {
+        e.stopPropagation();
+        const card = resolveBtn.closest('.chat-schedule-card');
+        const candidateIdx = parseInt(resolveBtn.getAttribute('data-candidate-idx') || '0', 10);
+        const conflictEnd = parseInt(resolveBtn.getAttribute('data-conflict-end') || '0', 10);
+        const saveCardBtn = card ? card.querySelector('[data-action="save-chat-card"]') : null;
+
+        if (card && saveCardBtn) {
+          const rawJson = saveCardBtn.getAttribute('data-schedules');
+          if (rawJson) {
+            try {
+              const schedules = JSON.parse(decodeURIComponent(rawJson));
+              if (schedules[candidateIdx]) {
+                const newStartMinutes = conflictEnd + 5;
+                const newTime = this.minutesToTimeString(newStartMinutes);
+                schedules[candidateIdx].time = newTime;
+
+                // Update data-schedules attribute for safe persistence
+                saveCardBtn.setAttribute('data-schedules', encodeURIComponent(JSON.stringify(schedules)));
+
+                // Update UI row time
+                const timeEls = card.querySelectorAll('.chat-schedule-item-time');
+                if (timeEls[candidateIdx]) {
+                  timeEls[candidateIdx].textContent = newTime;
+                  springBounce(timeEls[candidateIdx]);
+                }
+
+                // Replace banner with confirmation badge
+                const banner = resolveBtn.closest('.chat-conflict-banner');
+                if (banner) {
+                  banner.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
+                  banner.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                  banner.style.color = 'var(--status-success)';
+                  banner.innerHTML = `
+                    <div class="chat-conflict-info">
+                      ${getIcon('check', '', 14)}
+                      <span>Waktu disesuaikan ke <strong>${newTime}</strong> (bebas bentrok).</span>
+                    </div>
+                  `;
+                }
+
+                notifications.showToast(`Waktu kegiatan disesuaikan ke ${newTime} agar tidak bentrok.`, 'success');
+              }
+            } catch (err) {
+              console.error('Error resolving conflict:', err);
+            }
+          }
+        }
+        return;
+      }
 
       // Handle save schedule card from chat
       const saveBtn = target.closest('[data-action="save-chat-card"]');
@@ -841,7 +1199,10 @@ export const aiPlanViewMethods = {
 
   // --- 3. AI Plan View ---
   renderAiPlanView() {
+    this.renderLiveContextBar();
     this.initChatAttachments();
+    this.initChatSpeechRecognition();
+
     const chatHistoryEl = document.getElementById('chat-history');
     if (chatHistoryEl) {
       this.setupChatDelegation(chatHistoryEl);
@@ -901,6 +1262,24 @@ export const aiPlanViewMethods = {
             displayDate = `${firstDate} – ${lastDate} (${uniqueDates.length} Hari)`;
           } else {
             displayDate = 'Hari Ini';
+          }
+
+          // Conflict Detection against existing user agenda
+          const conflicts = this.detectCandidateConflicts(schedules, targetDate);
+          let conflictBannerHtml = '';
+          if (conflicts.length > 0 && !msg.savedSchedules) {
+            const firstConflict = conflicts[0];
+            conflictBannerHtml = `
+              <div class="chat-conflict-banner">
+                <div class="chat-conflict-info">
+                  ${getIcon('alert-triangle', '', 14)}
+                  <span>Bentrok: <strong>${escapeHtml(firstConflict.candidateTitle)}</strong> (${firstConflict.candidateTime}) beririsan dengan <strong>${escapeHtml(firstConflict.existingTitle)}</strong> (${firstConflict.existingTime}).</span>
+                </div>
+                <button type="button" class="btn-resolve-conflict" data-action="resolve-chat-conflict" data-candidate-idx="${firstConflict.candidateIdx}" data-conflict-end="${firstConflict.conflictEndTime}">
+                  ${getIcon('refresh-cw', '', 11)} Sesuaikan
+                </button>
+              </div>
+            `;
           }
 
           const itemsHtml = schedules.map(item => {
@@ -984,6 +1363,7 @@ export const aiPlanViewMethods = {
                 </div>
                 <span class="chat-schedule-date-tag">${displayDate}</span>
               </div>
+              ${conflictBannerHtml}
               <div class="chat-schedule-items">
                 ${itemsHtml}
               </div>
@@ -1032,11 +1412,32 @@ export const aiPlanViewMethods = {
           `;
         }
 
+        // Assistant Per-Bubble Action Toolbar
+        const actionToolbarHtml = `
+          <div class="chat-action-toolbar">
+            <button type="button" class="btn-chat-action" data-action="copy-chat-msg" data-msg-id="${msg.id || ('msg_idx_' + idx)}" title="Salin Jawaban">
+              <span class="action-icon">${getIcon('copy', '', 12)}</span>
+              <span class="action-label">Salin</span>
+            </button>
+            <button type="button" class="btn-chat-action" data-action="regenerate-chat-msg" data-msg-id="${msg.id || ('msg_idx_' + idx)}" title="Buat Ulang Tanggapan">
+              <span class="action-icon">${getIcon('refresh-cw', '', 12)}</span>
+              <span class="action-label">Regenerasi</span>
+            </button>
+            ${!note ? `
+              <button type="button" class="btn-chat-action" data-action="save-bubble-note" data-msg-id="${msg.id || ('msg_idx_' + idx)}" title="Simpan sebagai Catatan">
+                <span class="action-icon">${getIcon('file-text', '', 12)}</span>
+                <span class="action-label">Simpan Catatan</span>
+              </button>
+            ` : ''}
+          </div>
+        `;
+
         return `
           <div class="chat-bubble chat-bubble-assistant">
             <div class="chat-bubble-content">${formatMarkdown(finalCleanText || msg.text)}</div>
             ${scheduleCardHtml}
             ${noteCardHtml}
+            ${actionToolbarHtml}
             <div class="chat-meta text-muted" style="font-size: 10px; margin-top: 4px; text-align: right;">
               ${new Date(msg.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
             </div>
@@ -1046,18 +1447,163 @@ export const aiPlanViewMethods = {
 
       renderIcons(chatHistoryEl);
       chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+
+      // Render contextual follow-up chips
+      const lastMsg = history[history.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant') {
+        this.renderChatFollowupChips(lastMsg.text);
+      }
     }
   },
 
-  async handleSendChatMessage(e) {
-    e.preventDefault();
+  renderChatFollowupChips(lastAssistantReply = '') {
+    const container = document.getElementById('chat-followup-chips');
+    if (!container) return;
+
+    let suggestions = [];
+    const lower = (lastAssistantReply || '').toLowerCase();
+
+    if (lower.includes('[dayflow_schedules]') || lower.includes('jadwal') || lower.includes('agenda')) {
+      suggestions = [
+        'Bantu atur waktu istirahat dan jeda fokus',
+        'Bagaimana jika ada kegiatan yang digeser ke besok?',
+        'Evaluasi beban jadwal hari ini apakah terlalu padat'
+      ];
+    } else if (lower.includes('[dayflow_note]') || lower.includes('catatan') || lower.includes('ringkasan')) {
+      suggestions = [
+        'Rangkum poin utama catatan ini',
+        'Buatkan daftar langkah aksi konkret',
+        'Bantu susun prioritas dari catatan ini'
+      ];
+    } else if (lower.includes('tips') || lower.includes('strategi') || lower.includes('fokus') || lower.includes('waktu')) {
+      suggestions = [
+        'Beri contoh penerapannya dalam rutinitas harian',
+        'Buatkan jadwal aksi bertahap mulai hari ini',
+        'Bagaimana tips mengatasi distraksi kerja?'
+      ];
+    } else {
+      suggestions = [
+        'Susun jadwal fokus kerja hari ini',
+        'Bantu cek prioritas kegiatan terpenting',
+        'Beri saran time-blocking harian'
+      ];
+    }
+
+    container.innerHTML = suggestions.map(prompt => `
+      <button type="button" class="chat-followup-chip" data-prompt="${escapeHtml(prompt)}">
+        ${getIcon('chevron-right', '', 12)}
+        <span>${escapeHtml(prompt)}</span>
+      </button>
+    `).join('');
+
+    container.classList.remove('hidden');
+
+    if (!container._hasFollowupHandler) {
+      container._hasFollowupHandler = true;
+      container.addEventListener('click', (e) => {
+        const chip = e.target.closest('.chat-followup-chip');
+        if (!chip) return;
+        const prompt = chip.getAttribute('data-prompt');
+        if (!prompt) return;
+
+        const input = document.getElementById('chat-input');
+        if (input) {
+          input.value = prompt;
+          input.focus();
+          const form = document.getElementById('chat-form');
+          if (form) {
+            form.dispatchEvent(new Event('submit', { cancelable: true }));
+          }
+        }
+      });
+    }
+  },
+
+  streamAssistantMessage(reply, meta, shouldAutoSave, schedules, note) {
+    return new Promise((resolve) => {
+      const chatHistoryEl = document.getElementById('chat-history');
+      if (!chatHistoryEl) {
+        state.addChatMessage('assistant', reply, false, {
+          savedSchedules: meta.savedSchedules,
+          savedNote: false
+        });
+        this.renderAiPlanView();
+        resolve();
+        return;
+      }
+
+      // Create streaming placeholder element
+      const streamBubble = document.createElement('div');
+      streamBubble.className = 'chat-bubble chat-bubble-assistant';
+      streamBubble.id = 'active-streaming-bubble';
+      streamBubble.innerHTML = `
+        <div class="chat-bubble-content"><span class="chat-streaming-text"></span><span class="chat-streaming-cursor"></span></div>
+      `;
+      chatHistoryEl.appendChild(streamBubble);
+      chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+
+      const textSpan = streamBubble.querySelector('.chat-streaming-text');
+
+      // Extract display text without raw json blocks for streaming visual preview
+      const { cleanText: textAfterSchedule } = this.extractSchedulesFromAssistantMessage(reply);
+      const { cleanText: cleanDisplay } = this.extractNotesFromAssistantMessage(textAfterSchedule);
+      const displayText = cleanDisplay || reply;
+
+      // Tokenize by whitespace
+      const words = displayText.split(/(\s+)/);
+      let wordIdx = 0;
+      let isFlushed = false;
+
+      const finalize = () => {
+        if (isFlushed) return;
+        isFlushed = true;
+        if (streamBubble && streamBubble.parentNode) {
+          streamBubble.remove();
+        }
+        state.addChatMessage('assistant', reply, false, {
+          savedSchedules: meta.savedSchedules,
+          savedNote: false
+        });
+        this.renderAiPlanView();
+        resolve();
+      };
+
+      // Click anywhere in chat history to instantly flush streaming
+      const skipHandler = () => {
+        finalize();
+      };
+      chatHistoryEl.addEventListener('click', skipHandler, { once: true });
+
+      const streamTimer = setInterval(() => {
+        if (isFlushed) {
+          clearInterval(streamTimer);
+          return;
+        }
+
+        if (wordIdx < words.length) {
+          // Push 2 chunks at a time for fast fluid cadence
+          const chunk = (words[wordIdx] || '') + (words[wordIdx + 1] || '');
+          wordIdx += 2;
+          if (textSpan) textSpan.textContent += chunk;
+          chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        } else {
+          clearInterval(streamTimer);
+          chatHistoryEl.removeEventListener('click', skipHandler);
+          finalize();
+        }
+      }, 16);
+    });
+  },
+
+  async handleSendChatMessage(e, customPrompt = null) {
+    if (e && e.preventDefault) e.preventDefault();
     const input = document.getElementById('chat-input');
-    const text = input ? input.value.trim() : '';
+    const text = customPrompt !== null ? customPrompt : (input ? input.value.trim() : '');
     const activeAttachment = this.currentAttachment;
 
     if (!text && !activeAttachment) return;
 
-    if (input) input.value = '';
+    if (input && customPrompt === null) input.value = '';
 
     // Snapshot attachment for UI message history
     let attachmentMeta = null;
@@ -1098,10 +1644,7 @@ export const aiPlanViewMethods = {
         notifications.showToast(`${schedules.length} agenda otomatis dimasukkan ke jadwal!`, 'success');
       }
 
-      state.addChatMessage('assistant', reply, false, {
-        savedSchedules: isScheduleSaved,
-        savedNote: false
-      });
+      await this.streamAssistantMessage(reply, { savedSchedules: isScheduleSaved }, shouldAutoSave, schedules, note);
     } catch (err) {
       console.warn('AI chat error, attempting offline extraction fallback:', err);
       // Offline fallback: extract schedules directly from user text
@@ -1121,9 +1664,9 @@ export const aiPlanViewMethods = {
         state.addChatMessage('assistant', `Terjadi kendala saat menghubungi AI: ${err.message}`);
         notifications.showToast(err.message, 'error', 4500);
       }
+      this.renderAiPlanView();
     } finally {
       if (submitBtn) submitBtn.disabled = false;
-      this.renderAiPlanView();
     }
   },
 

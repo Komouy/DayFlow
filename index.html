@@ -349,6 +349,11 @@
           </button>
         </div>
 
+        <!-- Live Schedule & Context Indicator Bar -->
+        <div id="chat-live-context-bar" class="chat-live-context-bar" role="region" aria-label="Status Agenda Hari Ini">
+          <!-- Populated by JS: Realtime date, upcoming agenda, remaining tasks -->
+        </div>
+
         <!-- Conversational Chat Stream -->
         <div class="card ai-chat-card">
           <div class="quick-prompts">
@@ -374,6 +379,11 @@
           </div>
 
           <div class="chat-bottom-dock">
+            <!-- Dynamic Contextual Follow-up Chips -->
+            <div id="chat-followup-chips" class="chat-followup-chips hidden" aria-label="Saran Pertanyaan Lanjutan">
+              <!-- Dynamically populated chips -->
+            </div>
+
             <div class="chat-dock-meta">
               <label class="chat-auto-save-control">
                 <input type="checkbox" id="chat-auto-save-toggle">
@@ -400,8 +410,11 @@
               <button type="button" id="btn-chat-attach-file" class="btn btn-ghost btn-sm btn-icon" title="Lampirkan Gambar atau Berkas (PDF,txt,docx,csv)" aria-label="Lampirkan Berkas">
                 <span data-icon="paperclip" data-icon-size="16"></span>
               </button>
+              <button type="button" id="btn-chat-mic" class="btn btn-ghost btn-sm btn-icon chat-mic-btn" title="Dikte Suara (Bicara)" aria-label="Dikte Suara">
+                <span data-icon="mic" data-icon-size="16"></span>
+              </button>
               <input type="file" id="chat-file-input" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,text/markdown,application/json,.ics" class="hidden">
-              <input type="text" id="chat-input" class="chat-input" placeholder="Ketik rencana, jadwal, atau lampirkan foto/file" autocomplete="off">
+              <input type="text" id="chat-input" class="chat-input" placeholder="Ketik rencana, jadwal, atau gunakan suara" autocomplete="off">
               <button type="submit" id="chat-submit-btn" class="btn btn-primary btn-sm btn-icon" aria-label="Kirim Pesan">
                 <span data-icon="send" data-icon-size="16"></span>
               </button>

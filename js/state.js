@@ -387,6 +387,12 @@ export class StateManager {
       this._save(STORAGE_KEYS.SETTINGS, this.settings);
     }
 
+    // Auto-migrate to standardized single default Groq model (llama-3.3-70b-versatile)
+    if (!this.settings.groqModel || this.settings.groqModel !== 'llama-3.3-70b-versatile') {
+      this.settings.groqModel = 'llama-3.3-70b-versatile';
+      this._save(STORAGE_KEYS.SETTINGS, this.settings);
+    }
+
     // Auto-migrate: Remove hardcoded 'Dhaifan' so the app is generic and for everyone
         // Auto-migrate: heroBannerEnabled must default to false unless explicitly configured by the user
     if (!this.settings.hasConfiguredBanner) {

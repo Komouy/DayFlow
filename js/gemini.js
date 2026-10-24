@@ -351,9 +351,7 @@ export class GeminiService {
               })
             });
             if (response.ok) {
-              const data = await response.json();
-              if (model !== primaryModel) state.updateSettings({ geminiModel: model });
-              return data;
+              return await response.json();
             }
             const errData = await response.json().catch(() => ({}));
             const status = response.status;
@@ -373,9 +371,7 @@ export class GeminiService {
               body: JSON.stringify(payload)
             });
             if (response.ok) {
-              const data = await response.json();
-              if (model !== primaryModel) state.updateSettings({ geminiModel: model });
-              return data;
+              return await response.json();
             }
             const errData = await response.json().catch(() => ({}));
             const status = response.status;

@@ -337,6 +337,10 @@
         this.settings.geminiModel = "gemini-3.5-flash-lite";
         this._save(STORAGE_KEYS.SETTINGS, this.settings);
       }
+      if (!this.settings.groqModel || this.settings.groqModel !== "llama-3.3-70b-versatile") {
+        this.settings.groqModel = "llama-3.3-70b-versatile";
+        this._save(STORAGE_KEYS.SETTINGS, this.settings);
+      }
       if (!this.settings.hasConfiguredBanner) {
         this.settings.heroBannerEnabled = false;
         this.settings.hasConfiguredBanner = false;
@@ -2203,9 +2207,7 @@ Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan ke
                 })
               });
               if (response.ok) {
-                const data = await response.json();
-                if (model !== primaryModel) state.updateSettings({ geminiModel: model });
-                return data;
+                return await response.json();
               }
               const errData = await response.json().catch(() => ({}));
               const status = response.status;
@@ -2225,9 +2227,7 @@ Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan ke
                 body: JSON.stringify(payload)
               });
               if (response.ok) {
-                const data = await response.json();
-                if (model !== primaryModel) state.updateSettings({ geminiModel: model });
-                return data;
+                return await response.json();
               }
               const errData = await response.json().catch(() => ({}));
               const status = response.status;
@@ -6025,6 +6025,7 @@ ${JSON.stringify(fallbackItems)}
         apiKey: apiInput ? apiInput.value.trim() : "",
         groqApiKey: groqKey,
         grokApiKey: groqKey,
+        groqModel: document.getElementById("setting-groq-model")?.value || "llama-3.3-70b-versatile",
         geminiModel: modelSelect ? modelSelect.value : "gemini-3.5-flash-lite",
         notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : "15", 10) || 15,
         soundEnabled: soundToggle ? soundToggle.checked : true,

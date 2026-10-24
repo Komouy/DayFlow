@@ -122,16 +122,19 @@ export default {
 
     // 2. Health & Status Check Endpoint
     if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/health')) {
-      const isGeminiSet = Boolean(env.GEMINI_API_KEY && env.GEMINI_API_KEY.trim() !== '');
-      const isGrokSet = Boolean(env.GROK_API_KEY && env.GROK_API_KEY.trim() !== '');
+      const isGeminiSet = Boolean((env.GEMINI_API_KEY && env.GEMINI_API_KEY.trim() !== '') || (env.GOOGLE_API_KEY && env.GOOGLE_API_KEY.trim() !== ''));
+      const isGroqSet = Boolean((env.GROQ_API_KEY && env.GROQ_API_KEY.trim() !== '') || (env.GROK_API_KEY && env.GROK_API_KEY.trim() !== '') || (env.XAI_API_KEY && env.XAI_API_KEY.trim() !== ''));
 
       return new Response(JSON.stringify({
         status: 'online',
         service: 'DayFlow AI Serverless Gateway',
-        version: '1.2.0',
+        version: '1.3.1',
         geminiConfigured: isGeminiSet,
-        grokConfigured: isGrokSet,
-        keyConfigured: isGeminiSet || isGrokSet,
+        groqConfigured: isGroqSet,
+        grokConfigured: isGroqSet,
+        keyConfigured: isGeminiSet || isGroqSet,
+        defaultGeminiModel: 'gemini-3.5-flash-lite',
+        defaultGroqModel: 'llama-3.3-70b-versatile',
         timestamp: new Date().toISOString()
       }), {
         status: 200,

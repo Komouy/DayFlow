@@ -169,6 +169,7 @@ export const settingsViewMethods = {
       apiKey: apiInput ? apiInput.value.trim() : '',
       groqApiKey: groqKey,
       grokApiKey: groqKey,
+      groqModel: (document.getElementById('setting-groq-model')?.value || 'llama-3.3-70b-versatile'),
       geminiModel: modelSelect ? modelSelect.value : 'gemini-3.5-flash-lite',
       notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : '15', 10) || 15,
       soundEnabled: soundToggle ? soundToggle.checked : true,

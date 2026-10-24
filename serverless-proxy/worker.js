@@ -152,18 +152,22 @@ export default {
       });
     }
 
-    // 4. Verify Server Secret Configuration (Gemini or Grok)
+    // 4. Verify Server Secret Configuration (Gemini or Groq)
     const rawGeminiKey = env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '';
     const geminiKey = rawGeminiKey.trim().replace(/^["'`]|["'`]$/g, '').trim();
 
-    const rawGrokKey = env.GROK_API_KEY || env.XAI_API_KEY || '';
+    const rawGrokKey = env.GROQ_API_KEY || env.GROK_API_KEY || env.XAI_API_KEY || '';
     const grokKey = rawGrokKey.trim().replace(/^["'`]|["'`]$/g, '').trim();
-    const grokModel = env.GROK_MODEL || 'grok-2-latest';
+
+    // Determine Groq endpoint & default model based on key prefix
+    const isXaiKey = grokKey.startsWith('xai-');
+    const grokEndpoint = env.GROQ_API_URL || (isXaiKey ? 'https://api.x.ai/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions');
+    const grokModel = env.GROQ_MODEL || env.GROK_MODEL || (isXaiKey ? 'grok-2-latest' : 'llama-3.3-70b-versatile');
 
     if (!geminiKey && !grokKey) {
       return new Response(JSON.stringify({
         error: {
-          message: 'Kunci AI belum dikonfigurasi di Cloudflare Worker Secrets. Tambahkan secret GEMINI_API_KEY atau GROK_API_KEY di dashboard Cloudflare Workers Settings > Variables and Secrets.'
+          message: 'Kunci AI belum dikonfigurasi di Cloudflare Worker Secrets. Tambahkan secret GEMINI_API_KEY atau GROQ_API_KEY di dashboard Cloudflare Workers Settings > Variables and Secrets.'
         }
       }), {
         status: 500,
@@ -176,6 +180,7 @@ export default {
       
       let model = reqBody.model || 'gemini-2.5-flash';
       let payload = reqBody.payload || reqBody;
+      const requestedProvider = reqBody.provider || 'gemini'; // 'gemini' | 'groq'
 
       // Extract model from URL path if calling /models/:model:generateContent
       const pathMatch = url.pathname.match(/\/models\/([^:]+):generateContent/);
@@ -185,9 +190,34 @@ export default {
 
       let lastError = null;
 
-      // STEP 1: Attempt Gemini candidate models if GEMINI_API_KEY is configured
-      if (geminiKey) {
+      // Helper function to call Groq (GroqCloud / xAI)
+      const callGroq = async () => {
+        const grokPayload = convertGeminiPayloadToOpenAI(payload, grokModel);
+        const grokRes = await fetch(grokEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${grokKey}`
+          },
+          body: JSON.stringify(grokPayload)
+        });
+
+        if (grokRes.ok) {
+          const grokData = await grokRes.json();
+          const adaptedResponse = convertOpenAIToGeminiResponse(grokData);
+          adaptedResponse.provider = isXaiKey ? 'xai-grok' : 'groqcloud';
+          return adaptedResponse;
+        }
+
+        const grokErrData = await grokRes.json().catch(() => ({}));
+        const grokMsg = grokErrData?.error?.message || `Groq HTTP ${grokRes.status}`;
+        throw new Error(grokMsg);
+      };
+
+      // Helper function to call Gemini candidate models
+      const callGemini = async () => {
         const candidateModels = [model, ...FALLBACK_MODELS].filter((v, i, a) => a.indexOf(v) === i);
+        let geminiErr = null;
 
         for (const currentModel of candidateModels) {
           const googleEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${encodeURIComponent(geminiKey)}`;
@@ -205,67 +235,72 @@ export default {
             const resData = await googleRes.json();
 
             if (googleRes.ok) {
-              return new Response(JSON.stringify(resData), {
-                status: 200,
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...CORS_HEADERS
-                }
-              });
+              return resData;
             }
 
             const status = googleRes.status;
             const errMsg = resData?.error?.message || `HTTP ${status}`;
-            lastError = { status, message: errMsg, model: currentModel };
+            geminiErr = { status, message: errMsg, model: currentModel };
 
-            // For fatal client input errors (400 bad payload), do not retry Grok
             if (status === 400) {
-              return new Response(JSON.stringify(resData), {
-                status: status,
-                headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }
-              });
+              throw new Error(errMsg);
             }
-
-            // If 503 or 429, continue to next Gemini model in loop
           } catch (fetchErr) {
-            lastError = { status: 500, message: fetchErr.message, model: currentModel };
+            geminiErr = { status: 500, message: fetchErr.message, model: currentModel };
           }
         }
-      }
+        throw new Error(geminiErr?.message || 'Seluruh model Gemini gagal.');
+      };
 
-      // STEP 2: Automatic Serverless Failover to xAI Grok if Gemini is unavailable or failed
-      if (grokKey) {
+      // EXECUTION ROUTE:
+      // If user explicitly requests Groq as primary provider
+      if (requestedProvider === 'groq' && grokKey) {
         try {
-          const grokPayload = convertGeminiPayloadToOpenAI(payload, grokModel);
-          const grokEndpoint = 'https://api.x.ai/v1/chat/completions';
-
-          const grokRes = await fetch(grokEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${grokKey}`
-            },
-            body: JSON.stringify(grokPayload)
+          const groqResult = await callGroq();
+          return new Response(JSON.stringify(groqResult), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }
           });
-
-          if (grokRes.ok) {
-            const grokData = await grokRes.json();
-            const adaptedResponse = convertOpenAIToGeminiResponse(grokData);
-
-            return new Response(JSON.stringify(adaptedResponse), {
-              status: 200,
-              headers: {
-                'Content-Type': 'application/json',
-                ...CORS_HEADERS
-              }
-            });
+        } catch (groqErr) {
+          lastError = { message: `Groq gagal: ${groqErr.message}` };
+          // Fallback to Gemini if configured
+          if (geminiKey) {
+            try {
+              const geminiResult = await callGemini();
+              return new Response(JSON.stringify(geminiResult), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }
+              });
+            } catch (geminiErr) {
+              lastError = { message: `Groq gagal (${groqErr.message}) & Gemini fallback gagal (${geminiErr.message})` };
+            }
           }
+        }
+      } else {
+        // Default: Gemini primary, Groq fallback
+        if (geminiKey) {
+          try {
+            const geminiResult = await callGemini();
+            return new Response(JSON.stringify(geminiResult), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }
+            });
+          } catch (geminiErr) {
+            lastError = { message: geminiErr.message };
+          }
+        }
 
-          const grokErrData = await grokRes.json().catch(() => ({}));
-          const grokMsg = grokErrData?.error?.message || `Grok HTTP ${grokRes.status}`;
-          lastError = { status: grokRes.status, message: `Gemini sibuk & Grok gagal: ${grokMsg}`, details: lastError };
-        } catch (grokErr) {
-          lastError = { status: 500, message: `Gemini sibuk & Grok error: ${grokErr.message}`, details: lastError };
+        // Automatic fallback to Groq
+        if (grokKey) {
+          try {
+            const groqResult = await callGroq();
+            return new Response(JSON.stringify(groqResult), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', ...CORS_HEADERS }
+            });
+          } catch (groqErr) {
+            lastError = { message: `Gemini kendala & Groq fallback gagal: ${groqErr.message}`, details: lastError };
+          }
         }
       }
 

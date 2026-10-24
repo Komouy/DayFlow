@@ -492,16 +492,16 @@
             </div>
           </div>
 
-          <!-- Riwayat Rekap Harian (Daily Productivity Log per 24:00) -->
-          <div class="profile-history-section">
-            <div class="profile-history-header">
-              <span class="profile-history-title">Riwayat Ketercapaian Harian</span>
-              <span class="text-xs text-muted">Dicatat otomatis setiap pukul 24:00</span>
-            </div>
-            <div class="profile-history-list" id="profile-history-list">
+          <!-- Riwayat Rekap Harian (Collapsible Accordion for Clean UX) -->
+          <details class="profile-history-details" style="margin-top:12px; border-top:1px solid var(--border-subtle); padding-top:8px;">
+            <summary style="font-size:12px; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between; padding:4px 0;">
+              <span>Lihat Riwayat Hari Sebelumnya</span>
+              <span data-icon="chevron-down" data-icon-size="14"></span>
+            </summary>
+            <div class="profile-history-list" id="profile-history-list" style="margin-top:10px;">
               <!-- Rendered dynamically via settings-view.js -->
             </div>
-          </div>
+          </details>
         </div>
 
         <form id="settings-form" class="settings-section">
@@ -660,142 +660,133 @@
 
             </div>
           </div>
-          <!-- Gemini AI Architecture & API Gateway -->
-          <div class="settings-card">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:8px;">
+          <!-- Kecerdasan AI (Pilihan Mesin: Gemini / Groq) -->
+          <div class="settings-card" id="settings-ai-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
               <div class="settings-row-text" style="margin-bottom:0;">
-                <span class="settings-row-title">Layanan Kecerdasan AI</span>
-                <span class="settings-row-desc">DayFlow terhubung ke AI terpusat yang aman. Pengguna umum tidak perlu memasukkan API Key.</span>
+                <span class="settings-row-title">Kecerdasan AI</span>
+                <span class="settings-row-desc">Pilih mesin AI utama untuk analisis jadwal & rencana harian.</span>
               </div>
               <div id="central-ai-status-badge" style="padding:4px 10px; border-radius:var(--radius-pill); font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:6px; background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.25); white-space:nowrap;">
                 <span style="width:6px; height:6px; border-radius:50%; background:#22c55e; display:inline-block;"></span>
-                AI Terpusat Siap
+                AI Terhubung
               </div>
             </div>
 
-            <!-- Collapsible Developer Section (Hidden by default) -->
-            <details class="settings-developer-details" style="padding-top:10px; border-top:1px solid var(--border-subtle); margin-top:4px;">
-              <summary style="font-size:12px; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px; padding:4px 0;">
-                <span data-icon="settings" data-icon-size="13"></span>
-                <span>Opsi Lanjutan Pengembang (API Key Manual)</span>
-              </summary>
-              <div style="margin-top:10px;">
-                <label for="setting-api-key" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">
-                  API Key Pribadi (Opsional)
-                </label>
-                <div class="form-group" style="position:relative; display:flex; align-items:center; margin-bottom:8px;">
-                  <input type="password" id="setting-api-key" class="input-control" placeholder="Kosongkan jika memakai AI bawaan..." autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
-                  <button type="button" id="btn-toggle-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:40px; width:40px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan API Key" title="Tampilkan/Sembunyikan Key">
-                    <span data-icon="eye" data-icon-size="16"></span>
-                  </button>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                  <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-api-key" style="font-size:12px; color:var(--status-danger);" title="Hapus Key Pribadi dari Browser Ini">
-                    <span data-icon="trash" data-icon-size="13"></span>
-                    Hapus Gemini Key
-                  </button>
-                </div>
+            <!-- Segmented Engine Switcher: Gemini vs Groq -->
+            <div class="ai-provider-switcher" id="ai-provider-switcher" role="radiogroup" aria-label="Pilih Mesin AI">
+              <button type="button" class="ai-provider-tab is-active" id="btn-provider-gemini" data-provider="gemini">
+                <span data-icon="bot" data-icon-size="15"></span>
+                <span>Google Gemini</span>
+              </button>
+              <button type="button" class="ai-provider-tab" id="btn-provider-groq" data-provider="groq">
+                <span data-icon="zap" data-icon-size="15"></span>
+                <span>Groq (LPU / xAI)</span>
+              </button>
+            </div>
+            <input type="hidden" id="setting-ai-provider" value="gemini">
 
-                <!-- xAI Grok Fallback Key -->
-                <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-subtle);">
-                  <label for="setting-grok-api-key" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">
-                    xAI Grok API Key (Fallback Cadangan)
+            <!-- Panel Gemini -->
+            <div id="ai-panel-gemini" class="ai-provider-panel">
+              <div class="settings-column">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <label for="setting-model" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:0;">
+                    Model Gemini
                   </label>
+                  <span class="text-xs text-muted" id="current-model-desc">Rekomendasi Bawaan</span>
+                </div>
+                <select id="setting-model" class="input-control" style="font-size:13px; font-family:var(--font-sans); cursor:pointer;">
+                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Hemat kuota & penalaran luas)</option>
+                  <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Latensi rendah & respons cepat)</option>
+                  <option value="gemini-3.6-flash">Gemini 3.6 Flash (Penalaran seimbang)</option>
+                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Model cerdas generasi terbaru)</option>
+                </select>
+              </div>
+
+              <!-- Collapsible API Key Pribadi Gemini -->
+              <details class="settings-developer-details" style="border-top:1px solid var(--border-subtle); padding-top:8px;">
+                <summary style="font-size:12px; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;">
+                  <span data-icon="key" data-icon-size="13"></span>
+                  <span>Gunakan Gemini API Key Pribadi (Opsional)</span>
+                </summary>
+                <div style="margin-top:8px;">
                   <div class="form-group" style="position:relative; display:flex; align-items:center; margin-bottom:6px;">
-                    <input type="password" id="setting-grok-api-key" class="input-control" placeholder="xai-..." autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
-                    <button type="button" id="btn-toggle-grok-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:40px; width:40px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan Grok Key" title="Tampilkan/Sembunyikan Grok Key">
-                      <span data-icon="eye" data-icon-size="16"></span>
+                    <input type="password" id="setting-api-key" class="input-control" placeholder="Kosongkan jika menggunakan server gateway..." autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
+                    <button type="button" id="btn-toggle-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:36px; width:36px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan API Key" title="Tampilkan/Sembunyikan Key">
+                      <span data-icon="eye" data-icon-size="15"></span>
                     </button>
                   </div>
-                  <span class="settings-row-desc" style="font-size:11px; margin-bottom:8px; display:block;">
-                    Jika Gemini mengalami kendala kuota atau sibuk (503/429), DayFlow otomatis mengalihkan proses ke engine Grok.
-                  </span>
-                  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                    <button type="button" class="btn btn-secondary btn-xs" id="btn-test-grok-api" style="font-size:12px;">
-                      <span data-icon="zap" data-icon-size="12"></span>
-                      Uji Grok Key
-                    </button>
-                    <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-grok-api-key" style="font-size:12px; color:var(--status-danger);" title="Hapus Grok Key dari Browser Ini">
-                      <span data-icon="trash" data-icon-size="13"></span>
-                      Hapus Grok Key
-                    </button>
-                  </div>
+                  <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-api-key" style="font-size:11.5px; color:var(--status-danger);">
+                    <span data-icon="trash" data-icon-size="12"></span>
+                    Hapus Key Pribadi
+                  </button>
+                </div>
+              </details>
+            </div>
+
+            <!-- Panel Groq (GroqCloud & xAI) -->
+            <div id="ai-panel-groq" class="ai-provider-panel hidden">
+              <div class="settings-column">
+                <label for="setting-groq-api-key" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">
+                  Groq / xAI API Key
+                </label>
+                <div class="form-group" style="position:relative; display:flex; align-items:center; margin-bottom:6px;">
+                  <input type="password" id="setting-groq-api-key" class="input-control" placeholder="gsk_... (GroqCloud) atau xai-... (xAI)" autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
+                  <button type="button" id="btn-toggle-groq-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:36px; width:36px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan Key" title="Tampilkan/Sembunyikan Key">
+                    <span data-icon="eye" data-icon-size="15"></span>
+                  </button>
+                </div>
+                <span class="settings-row-desc" style="font-size:11px; margin-bottom:8px;">
+                  Mendukung GroqCloud (Llama 3.3 70B LPU) dan xAI Grok. Terdeteksi otomatis dari awalan kunci.
+                </span>
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <button type="button" class="btn btn-secondary btn-xs" id="btn-test-groq-api" style="font-size:12px;">
+                    <span data-icon="zap" data-icon-size="12"></span>
+                    Uji Koneksi Groq
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-groq-api-key" style="font-size:11.5px; color:var(--status-danger);" title="Hapus Groq Key">
+                    <span data-icon="trash" data-icon-size="12"></span>
+                    Hapus Key
+                  </button>
                 </div>
               </div>
-            </details>
+            </div>
 
-            <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-top:10px;">
-              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-                <button type="button" class="btn btn-ghost btn-sm" id="btn-open-api-guide" style="font-size:12px; color:var(--accent-primary);" title="Lihat Panduan & Tata Cara Gateway">
-                  <span data-icon="file-text" data-icon-size="13"></span>
-                  Panduan Serverless Proxy
-                </button>
-              </div>
+            <!-- Footer Aksi AI -->
+            <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:10px; margin-top:4px; flex-wrap:wrap; gap:8px;">
+              <a href="/panduan-api.html" class="btn btn-ghost btn-xs" style="font-size:12px; color:var(--accent-primary); text-decoration:none;">
+                <span data-icon="file-text" data-icon-size="13"></span>
+                Panduan Gateway & API
+              </a>
               <button type="button" class="btn btn-secondary btn-sm" id="btn-test-api">
                 Uji Koneksi AI
               </button>
             </div>
           </div>
 
-          <!-- Model Gemini Default Status Card -->
+          <!-- Tema Tampilan (Clean Horizontal Bar) -->
           <div class="settings-card">
-            <div class="settings-row-text" style="margin-bottom:8px;">
-              <span class="settings-row-title">Model Gemini Default</span>
-              <span class="settings-row-desc">Kecerdasan AI terpadu untuk analisis jadwal, ringkasan, dan asisten proaktif.</span>
-            </div>
-            <div class="custom-select-trigger" style="cursor:default; pointer-events:none;">
-              <div class="trigger-meta">
-                <div class="trigger-icon-wrap" style="color:var(--accent-primary); background:var(--accent-primary-soft);">
-                  <span data-icon="bot" data-icon-size="17"></span>
-                </div>
-                <div class="trigger-text-group">
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="trigger-value" id="current-model-name">Gemini 2.5 Flash</span>
-                    <span class="model-option-badge" style="background-color:var(--accent-primary-soft); color:var(--accent-primary); border-color:var(--accent-primary-border); font-size:10px; padding:2px 7px;">Aktif & Hemat Kuota</span>
-                  </div>
-                  <span class="trigger-sub" id="current-model-desc">Respon luas, penalaran terperinci & hemat kuota token</span>
-                </div>
+            <div class="settings-row" style="margin-bottom:6px;">
+              <div class="settings-row-text">
+                <span class="settings-row-title">Tema Tampilan</span>
+                <span class="settings-row-desc">Sesuaikan nuansa peramban dengan kenyamanan Anda.</span>
               </div>
             </div>
-            <input type="hidden" id="setting-model" value="gemini-2.5-flash">
-          </div>
-
-          <!-- Theme Preference -->
-          <div class="settings-card">
-            <div class="settings-row-text">
-              <span class="settings-row-title">Tema Tampilan</span>
-              <span class="settings-row-desc">Pilih nuansa antarmuka yang paling nyaman untuk matamu.</span>
-            </div>
-            <div class="theme-radio-grid" role="radiogroup" aria-label="Pilihan Tema">
-              <label class="theme-radio-item">
+            <div class="settings-theme-bar" role="radiogroup" aria-label="Pilihan Tema">
+              <label class="settings-theme-pill is-active" id="theme-pill-dark">
                 <input type="radio" name="setting-theme" value="dark" checked>
-                <div class="theme-radio-card">
-                  <span class="theme-swatch dark-swatch"></span>
-                  <div class="theme-radio-meta">
-                    <span class="theme-radio-name">Gelap</span>
-                    <span class="theme-radio-sub">OLED Slate</span>
-                  </div>
-                </div>
+                <span data-icon="moon" data-icon-size="14"></span>
+                <span>Gelap</span>
               </label>
-              <label class="theme-radio-item">
+              <label class="settings-theme-pill" id="theme-pill-light">
                 <input type="radio" name="setting-theme" value="light">
-                <div class="theme-radio-card">
-                  <span class="theme-swatch light-swatch"></span>
-                  <div class="theme-radio-meta">
-                    <span class="theme-radio-name">Terang</span>
-                    <span class="theme-radio-sub">Editorial Paper</span>
-                  </div>
-                </div>
+                <span data-icon="sun" data-icon-size="14"></span>
+                <span>Terang</span>
               </label>
-              <label class="theme-radio-item">
+              <label class="settings-theme-pill" id="theme-pill-system">
                 <input type="radio" name="setting-theme" value="system">
-                <div class="theme-radio-card">
-                  <span class="theme-swatch system-swatch"></span>
-                  <div class="theme-radio-meta">
-                    <span class="theme-radio-name">Sistem</span>
-                    <span class="theme-radio-sub">Otomatis OS</span>
-                  </div>
-                </div>
+                <span data-icon="monitor" data-icon-size="14"></span>
+                <span>Sistem</span>
               </label>
             </div>
           </div>
@@ -959,35 +950,27 @@
           </button>
         </form>
 
-        <!-- Kategori Jadwal Fleksibel -->
+        <!-- Kategori & Cadangan Data -->
         <div class="settings-card">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div class="settings-row-text">
-              <span class="settings-row-title">Kategori Jadwal Fleksibel</span>
-              <span class="settings-row-desc">Buat kategori kustom sesuai aktivitasmu (Kerja, Kuliah, Hobi, Olahraga, dll).</span>
+              <span class="settings-row-title">Kategori & Cadangan Data</span>
+              <span class="settings-row-desc">Atur label aktivitas atau simpan cadangan data jadwal.</span>
             </div>
             <button type="button" class="btn btn-secondary btn-sm" id="btn-settings-manage-categories" onclick="window.dayflowApp.openCategoryModal()" style="font-size:12px; display:inline-flex; align-items:center; gap:5px;">
               <span data-icon="plus" data-icon-size="13"></span>
               Kelola Kategori
             </button>
           </div>
-          <div id="settings-categories-preview" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+          <div id="settings-categories-preview" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
             <!-- Populated dynamically with category badges -->
           </div>
-        </div>
-
-        <!-- Data Backup & Reset -->
-        <div class="settings-card">
-          <div class="settings-row-text">
-            <span class="settings-row-title">Cadangkan & Pulihkan Data</span>
-            <span class="settings-row-desc">Simpan data jadwal dan catatanmu sebagai file JSON untuk dipindahkan antar perangkat.</span>
-          </div>
-          <div style="display:flex; gap:8px;">
-            <button class="btn btn-secondary btn-sm" id="btn-export-data" style="flex:1;">
+          <div style="display:flex; gap:8px; border-top:1px solid var(--border-subtle); padding-top:12px; margin-top:4px;">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-export-data" style="flex:1;">
               <span data-icon="download" data-icon-size="14"></span>
               Ekspor JSON
             </button>
-            <button class="btn btn-secondary btn-sm" id="btn-import-data" style="flex:1;">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-import-data" style="flex:1;">
               Impor JSON
             </button>
             <input type="file" id="input-import-file" accept=".json" class="hidden">

@@ -360,19 +360,64 @@ class AppController {
     window.addEventListener('click', keepAudioUnlocked, { passive: true });
     window.addEventListener('touchstart', keepAudioUnlocked, { passive: true });
 
-    // Test API key connection button
+    // AI Engine Switcher (Google Gemini vs Groq)
+    document.querySelectorAll('#ai-provider-switcher button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const provider = btn.getAttribute('data-provider') || 'gemini';
+        const providerInput = document.getElementById('setting-ai-provider');
+        if (providerInput) providerInput.value = provider;
+        state.updateSettings({ aiProvider: provider });
+        document.querySelectorAll('#ai-provider-switcher button').forEach(b => {
+          b.classList.toggle('is-active', b === btn);
+        });
+        const geminiPanel = document.getElementById('ai-panel-gemini');
+        const groqPanel = document.getElementById('ai-panel-groq');
+        if (geminiPanel) geminiPanel.classList.toggle('hidden', provider !== 'gemini');
+        if (groqPanel) groqPanel.classList.toggle('hidden', provider !== 'groq');
+        springBounce(btn);
+        this.renderSettingsView();
+      });
+    });
+
+    // Model selection change
+    const modelSelect = document.getElementById('setting-model');
+    if (modelSelect) {
+      modelSelect.addEventListener('change', () => {
+        const modelId = modelSelect.value;
+        state.updateSettings({ geminiModel: modelId });
+        this.updateModelPickerUI(modelId);
+      });
+    }
+
+    // Theme selector pills
+    document.querySelectorAll('.settings-theme-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        const radio = pill.querySelector('input[type="radio"]');
+        if (radio) {
+          radio.checked = true;
+          const theme = radio.value;
+          document.querySelectorAll('.settings-theme-pill').forEach(p => p.classList.remove('is-active'));
+          pill.classList.add('is-active');
+          state.updateSettings({ theme });
+          this.applyTheme(theme);
+          springBounce(pill);
+        }
+      });
+    });
+
+    // Test API key connection button (Gemini or active provider)
     const testApiBtn = document.getElementById('btn-test-api');
     if (testApiBtn) {
       testApiBtn.addEventListener('click', () => this.handleTestApiKey());
     }
 
-    // Clear API key button
+    // Clear Gemini API key button
     const clearKeyBtn = document.getElementById('btn-clear-api-key');
     if (clearKeyBtn) {
       clearKeyBtn.addEventListener('click', () => this.handleClearSavedApiKey());
     }
 
-    // Toggle API key visibility
+    // Toggle Gemini API key visibility
     const toggleKeyBtn = document.getElementById('btn-toggle-key-visibility');
     const apiKeyInput = document.getElementById('setting-api-key');
     if (toggleKeyBtn && apiKeyInput) {
@@ -383,24 +428,24 @@ class AppController {
       });
     }
 
-    // Grok Fallback Key Controls
-    const testGrokBtn = document.getElementById('btn-test-grok-api');
-    if (testGrokBtn) {
-      testGrokBtn.addEventListener('click', () => this.handleTestGrokApiKey());
+    // Groq / Grok Key Controls
+    const testGroqBtn = document.getElementById('btn-test-groq-api') || document.getElementById('btn-test-grok-api');
+    if (testGroqBtn) {
+      testGroqBtn.addEventListener('click', () => this.handleTestGroqApiKey());
     }
 
-    const clearGrokBtn = document.getElementById('btn-clear-grok-api-key');
-    if (clearGrokBtn) {
-      clearGrokBtn.addEventListener('click', () => this.handleClearGrokApiKey());
+    const clearGroqBtn = document.getElementById('btn-clear-groq-api-key') || document.getElementById('btn-clear-grok-api-key');
+    if (clearGroqBtn) {
+      clearGroqBtn.addEventListener('click', () => this.handleClearGroqApiKey());
     }
 
-    const toggleGrokBtn = document.getElementById('btn-toggle-grok-key-visibility');
-    const grokKeyInput = document.getElementById('setting-grok-api-key');
-    if (toggleGrokBtn && grokKeyInput) {
-      toggleGrokBtn.addEventListener('click', () => {
-        const isPassword = grokKeyInput.type === 'password';
-        grokKeyInput.type = isPassword ? 'text' : 'password';
-        toggleGrokBtn.innerHTML = getIcon(isPassword ? 'eye-off' : 'eye', '', 16);
+    const toggleGroqBtn = document.getElementById('btn-toggle-groq-key-visibility') || document.getElementById('btn-toggle-grok-key-visibility');
+    const groqKeyInput = document.getElementById('setting-groq-api-key') || document.getElementById('setting-grok-api-key');
+    if (toggleGroqBtn && groqKeyInput) {
+      toggleGroqBtn.addEventListener('click', () => {
+        const isPassword = groqKeyInput.type === 'password';
+        groqKeyInput.type = isPassword ? 'text' : 'password';
+        toggleGroqBtn.innerHTML = getIcon(isPassword ? 'eye-off' : 'eye', '', 16);
       });
     }
 

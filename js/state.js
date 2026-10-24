@@ -293,6 +293,9 @@ const DEFAULT_SETTINGS = {
   heroBannerOverlay: 'medium',
   heroBannerQuote: 'Fokus pada hal penting hari ini.',
   chatAutoSave: false,
+  aiProvider: 'gemini',
+  groqApiKey: '',
+  groqModel: 'llama-3.3-70b-versatile',
   grokApiKey: '',
   grokModel: 'grok-2-latest'
 };

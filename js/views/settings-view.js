@@ -15,45 +15,74 @@ export const settingsViewMethods = {
   // --- 5. Settings View ---
   renderSettingsView() {
     const settings = state.getSettings();
+    const provider = settings.aiProvider || 'gemini';
     const apiInput = document.getElementById('setting-api-key');
     const modelSelect = document.getElementById('setting-model');
     const advanceInput = document.getElementById('setting-advance');
     const soundToggle = document.getElementById('setting-sound');
     const toneSelect = document.getElementById('setting-sound-tone');
     const proactiveToggle = document.getElementById('setting-proactive');
+    const providerInput = document.getElementById('setting-ai-provider');
+    const groqInput = document.getElementById('setting-groq-api-key') || document.getElementById('setting-grok-api-key');
 
-    const grokInput = document.getElementById('setting-grok-api-key');
-
+    if (providerInput) providerInput.value = provider;
     if (apiInput) apiInput.value = settings.apiKey || '';
-    if (grokInput) grokInput.value = settings.grokApiKey || '';
+    if (groqInput) groqInput.value = settings.groqApiKey || settings.grokApiKey || '';
     if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || 'gemini-2.5-flash';
     if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
 
-    // Sync Centralized AI Architecture Status Badge
+    // Sync AI Provider Switcher UI & Active Panels
+    document.querySelectorAll('#ai-provider-switcher button').forEach(btn => {
+      const p = btn.getAttribute('data-provider');
+      btn.classList.toggle('is-active', p === provider);
+    });
+
+    const geminiPanel = document.getElementById('ai-panel-gemini');
+    const groqPanel = document.getElementById('ai-panel-groq');
+    if (geminiPanel) geminiPanel.classList.toggle('hidden', provider !== 'gemini');
+    if (groqPanel) groqPanel.classList.toggle('hidden', provider !== 'groq');
+
+    // Sync AI Architecture Status Badge
     const badgeEl = document.getElementById('central-ai-status-badge');
     if (badgeEl) {
-      if (settings.apiKey) {
-        badgeEl.style.background = 'rgba(234, 88, 12, 0.12)';
-        badgeEl.style.color = '#ea580c';
-        badgeEl.style.borderColor = 'rgba(234, 88, 12, 0.25)';
-        badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ea580c; display:inline-block;"></span> Key Pribadi Aktif`;
-      } else if (settings.grokApiKey) {
-        badgeEl.style.background = 'rgba(14, 165, 233, 0.12)';
-        badgeEl.style.color = '#0ea5e9';
-        badgeEl.style.borderColor = 'rgba(14, 165, 233, 0.25)';
-        badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#0ea5e9; display:inline-block;"></span> AI + Grok Siap`;
-      } else if (GeminiService.isAiReady()) {
-        badgeEl.style.background = 'rgba(34, 197, 94, 0.12)';
-        badgeEl.style.color = '#22c55e';
-        badgeEl.style.borderColor = 'rgba(34, 197, 94, 0.25)';
-        badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#22c55e; display:inline-block;"></span> AI Terpusat Siap`;
+      if (provider === 'groq') {
+        const hasGroqKey = Boolean(settings.groqApiKey || settings.grokApiKey);
+        if (hasGroqKey) {
+          badgeEl.style.background = 'rgba(14, 165, 233, 0.12)';
+          badgeEl.style.color = '#0ea5e9';
+          badgeEl.style.borderColor = 'rgba(14, 165, 233, 0.25)';
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#0ea5e9; display:inline-block;"></span> Groq Pribadi Aktif`;
+        } else if (GeminiService.isAiReady()) {
+          badgeEl.style.background = 'rgba(34, 197, 94, 0.12)';
+          badgeEl.style.color = '#22c55e';
+          badgeEl.style.borderColor = 'rgba(34, 197, 94, 0.25)';
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#22c55e; display:inline-block;"></span> Groq Gateway Siap`;
+        } else {
+          badgeEl.style.background = 'rgba(239, 68, 68, 0.12)';
+          badgeEl.style.color = '#ef4444';
+          badgeEl.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ef4444; display:inline-block;"></span> Belum Terhubung`;
+        }
       } else {
-        badgeEl.style.background = 'rgba(239, 68, 68, 0.12)';
-        badgeEl.style.color = '#ef4444';
-        badgeEl.style.borderColor = 'rgba(239, 68, 68, 0.25)';
-        badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ef4444; display:inline-block;"></span> Belum Terhubung`;
+        if (settings.apiKey) {
+          badgeEl.style.background = 'rgba(234, 88, 12, 0.12)';
+          badgeEl.style.color = '#ea580c';
+          badgeEl.style.borderColor = 'rgba(234, 88, 12, 0.25)';
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ea580c; display:inline-block;"></span> Gemini Key Aktif`;
+        } else if (GeminiService.isAiReady()) {
+          badgeEl.style.background = 'rgba(34, 197, 94, 0.12)';
+          badgeEl.style.color = '#22c55e';
+          badgeEl.style.borderColor = 'rgba(34, 197, 94, 0.25)';
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#22c55e; display:inline-block;"></span> Gemini Gateway Siap`;
+        } else {
+          badgeEl.style.background = 'rgba(239, 68, 68, 0.12)';
+          badgeEl.style.color = '#ef4444';
+          badgeEl.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ef4444; display:inline-block;"></span> Belum Terhubung`;
+        }
       }
     }
+
     if (soundToggle) soundToggle.checked = settings.soundEnabled !== false;
     if (toneSelect) toneSelect.value = settings.soundTone || 'crystal';
     if (proactiveToggle) proactiveToggle.checked = settings.proactiveReminders !== false;
@@ -63,8 +92,14 @@ export const settingsViewMethods = {
     // Sync Notification Permission Badge & Controls
     this.updateNotificationPermissionUI();
 
-    const themeRadio = document.querySelector(`input[name="setting-theme"][value="${settings.theme || 'dark'}"]`);
+    // Sync Theme Pills
+    const currentTheme = settings.theme || 'dark';
+    const themeRadio = document.querySelector(`input[name="setting-theme"][value="${currentTheme}"]`);
     if (themeRadio) themeRadio.checked = true;
+    document.querySelectorAll('.settings-theme-pill').forEach(pill => {
+      const radio = pill.querySelector('input');
+      pill.classList.toggle('is-active', radio && radio.value === currentTheme);
+    });
 
     // Sync custom Segmented Chips for Advance Minutes
     const advanceVal = parseInt(settings.notifyAdvanceMinutes || 15, 10);
@@ -80,7 +115,7 @@ export const settingsViewMethods = {
       item.classList.toggle('is-active', val === currentTone);
     });
 
-    // Sync Gemini Model Badge
+    // Sync Model descriptions
     this.updateModelPickerUI(settings.geminiModel || 'gemini-2.5-flash');
 
     // Sync Profile & Hero Banner Settings
@@ -95,36 +130,23 @@ export const settingsViewMethods = {
 
   updateModelPickerUI(modelId = 'gemini-2.5-flash') {
     const hiddenInput = document.getElementById('setting-model');
-    if (hiddenInput) hiddenInput.value = modelId;
+    if (hiddenInput && hiddenInput.value !== modelId) hiddenInput.value = modelId;
 
-    const nameEl = document.getElementById('current-model-name');
     const descEl = document.getElementById('current-model-desc');
     const modelMeta = {
-      'gemini-2.5-flash': {
-        name: 'Gemini 2.5 Flash',
-        desc: 'Respon luas, penalaran terperinci & hemat kuota token'
-      },
-      'gemini-3.5-flash-lite': {
-        name: 'Gemini 3.5 Flash-Lite',
-        desc: 'Eksekusi instan, latensi rendah & respons super cepat'
-      },
-      'gemini-3.6-flash': {
-        name: 'Gemini 3.6 Flash',
-        desc: 'Keseimbangan performa tinggi & penalaran mendalam'
-      },
-      'gemini-3.8-flash': {
-        name: 'Gemini 3.8 Flash',
-        desc: 'Model cerdas generasi terbaru'
-      }
+      'gemini-2.5-flash': 'Hemat kuota & penalaran luas',
+      'gemini-3.5-flash-lite': 'Latensi rendah & respons super cepat',
+      'gemini-3.6-flash': 'Keseimbangan performa tinggi & penalaran mendalam',
+      'gemini-3.8-flash': 'Model cerdas generasi terbaru'
     };
-    const current = modelMeta[modelId] || { name: modelId, desc: 'Model AI terkonfigurasi' };
-    if (nameEl) nameEl.textContent = current.name;
-    if (descEl) descEl.textContent = current.desc;
+    if (descEl) descEl.textContent = modelMeta[modelId] || 'Rekomendasi Bawaan';
   },
 
   handleSaveSettings(e) {
     e.preventDefault();
+    const providerInput = document.getElementById('setting-ai-provider');
     const apiInput = document.getElementById('setting-api-key');
+    const groqInput = document.getElementById('setting-groq-api-key') || document.getElementById('setting-grok-api-key');
     const modelSelect = document.getElementById('setting-model');
     const advanceInput = document.getElementById('setting-advance');
     const soundToggle = document.getElementById('setting-sound');
@@ -138,10 +160,10 @@ export const settingsViewMethods = {
     const bannerQuoteInput = document.getElementById('setting-banner-quote');
     const bannerUrlInput = document.getElementById('setting-banner-url');
     const bannerEnabledToggle = document.getElementById('setting-banner-enabled');
-
     const systemNotifToggle = document.getElementById('setting-system-notif');
 
-    const grokInput = document.getElementById('setting-grok-api-key');
+    const selectedProvider = providerInput ? providerInput.value : 'gemini';
+    const groqKey = groqInput ? groqInput.value.trim() : '';
 
     state.updateSettings({
       userName: userNameInput ? userNameInput.value.trim() : '',
@@ -149,8 +171,10 @@ export const settingsViewMethods = {
       hasConfiguredBanner: (bannerEnabledToggle && bannerEnabledToggle.checked) || state.getSettings().hasConfiguredBanner || false,
       heroBannerQuote: bannerQuoteInput ? bannerQuoteInput.value.trim() : 'Fokus pada hal penting hari ini.',
       heroBannerUrl: bannerUrlInput ? bannerUrlInput.value.trim() : '',
+      aiProvider: selectedProvider,
       apiKey: apiInput ? apiInput.value.trim() : '',
-      grokApiKey: grokInput ? grokInput.value.trim() : '',
+      groqApiKey: groqKey,
+      grokApiKey: groqKey,
       geminiModel: modelSelect ? modelSelect.value : 'gemini-2.5-flash',
       notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : '15', 10) || 15,
       soundEnabled: soundToggle ? soundToggle.checked : true,
@@ -194,6 +218,11 @@ export const settingsViewMethods = {
   },
 
   async handleTestApiKey() {
+    const currentProvider = state.getSettings().aiProvider || 'gemini';
+    if (currentProvider === 'groq') {
+      return this.handleTestGroqApiKey();
+    }
+
     const apiKey = document.getElementById('setting-api-key')?.value.trim();
     const testBtn = document.getElementById('btn-test-api');
     const orig = testBtn.innerHTML;
@@ -206,22 +235,22 @@ export const settingsViewMethods = {
         const res = await GeminiService.testConnection(apiKey);
         state.updateSettings({ apiKey, geminiModel: res.model || 'gemini-2.5-flash' });
         this.renderSettingsView();
-        notifications.showToast(`API Key pribadi valid dan tersimpan! (${res.model})`, 'success', 5000);
+        notifications.showToast(`Gemini API Key pribadi valid & aktif! (${res.model})`, 'success', 5000);
       } else if (GeminiService.isAiReady()) {
         // Test centralized AI / proxy
         const res = await GeminiService.testConnection(null);
-        const modeTitle = res.mode === 'proxy' ? 'Serverless AI Proxy' : 'AI Terpusat';
+        const modeTitle = res.mode === 'proxy' ? 'Serverless Gateway' : 'AI Terpusat';
         this.renderSettingsView();
         notifications.showToast(`Koneksi ${modeTitle} berhasil & siap digunakan! (${res.model})`, 'success', 5000);
       } else {
-        notifications.showToast('Belum ada Serverless Proxy atau API Key yang dihubungkan.', 'warning', 5000);
+        notifications.showToast('Belum ada Serverless Gateway atau API Key yang dihubungkan.', 'warning', 5000);
       }
     } catch (err) {
-      notifications.showToast(`Uji gagal: ${err.message}`, 'error', 6000);
+      notifications.showToast(`Uji Gemini gagal: ${err.message}`, 'error', 6000);
     } finally {
       testBtn.disabled = false;
       testBtn.innerHTML = orig;
-      renderIcons();
+      renderIcons(testBtn);
     }
   },
 
@@ -230,16 +259,13 @@ export const settingsViewMethods = {
     const apiInput = document.getElementById('setting-api-key');
     if (apiInput) apiInput.value = '';
     this.renderSettingsView();
-    notifications.showToast('API Key pribadi telah dihapus dari peramban ini. DayFlow kini aktif menggunakan AI Terpusat.', 'success', 5000);
+    notifications.showToast('Gemini API Key pribadi telah dihapus.', 'success', 5000);
   },
 
-  async handleTestGrokApiKey() {
-    const grokKey = document.getElementById('setting-grok-api-key')?.value.trim();
-    const testBtn = document.getElementById('btn-test-grok-api');
-    if (!grokKey) {
-      notifications.showToast('Masukkan xAI Grok API Key terlebih dahulu untuk menguji.', 'warning', 4000);
-      return;
-    }
+  async handleTestGroqApiKey() {
+    const groqInput = document.getElementById('setting-groq-api-key') || document.getElementById('setting-grok-api-key');
+    const groqKey = groqInput ? groqInput.value.trim() : '';
+    const testBtn = document.getElementById('btn-test-groq-api') || document.getElementById('btn-test-grok-api') || document.getElementById('btn-test-api');
     const orig = testBtn ? testBtn.innerHTML : '';
     if (testBtn) {
       testBtn.disabled = true;
@@ -247,12 +273,14 @@ export const settingsViewMethods = {
     }
 
     try {
-      const res = await GeminiService.testGrokConnection(grokKey);
-      state.updateSettings({ grokApiKey: grokKey });
+      const res = await GeminiService.testGroqConnection(groqKey);
+      if (groqKey) {
+        state.updateSettings({ groqApiKey: groqKey, grokApiKey: groqKey });
+      }
       this.renderSettingsView();
-      notifications.showToast(`Koneksi xAI Grok valid dan siap sebagai fallback cadangan! (${res.model})`, 'success', 5000);
+      notifications.showToast(`Koneksi ${res.provider || 'Groq'} valid & siap digunakan! (${res.model})`, 'success', 5000);
     } catch (err) {
-      notifications.showToast(`Uji Grok gagal: ${err.message}`, 'error', 6000);
+      notifications.showToast(`Uji Groq gagal: ${err.message}`, 'error', 6000);
     } finally {
       if (testBtn) {
         testBtn.disabled = false;
@@ -262,12 +290,21 @@ export const settingsViewMethods = {
     }
   },
 
-  handleClearGrokApiKey() {
-    state.updateSettings({ grokApiKey: '' });
-    const grokInput = document.getElementById('setting-grok-api-key');
-    if (grokInput) grokInput.value = '';
+  handleClearGroqApiKey() {
+    state.updateSettings({ groqApiKey: '', grokApiKey: '' });
+    const groqInput = document.getElementById('setting-groq-api-key') || document.getElementById('setting-grok-api-key');
+    if (groqInput) groqInput.value = '';
     this.renderSettingsView();
-    notifications.showToast('Grok API Key cadangan telah dihapus dari peramban ini.', 'success', 5000);
+    notifications.showToast('Groq API Key telah dihapus.', 'success', 5000);
+  },
+
+  // Backward compatibility aliases
+  handleTestGrokApiKey() {
+    return this.handleTestGroqApiKey();
+  },
+
+  handleClearGrokApiKey() {
+    return this.handleClearGroqApiKey();
   },
 
   handleExportData() {

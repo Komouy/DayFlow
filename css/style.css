@@ -5466,4 +5466,97 @@ button.btn-add-category-pill {
   background-color: var(--accent-primary-soft);
 }
 
+/* --- Simplified Settings & AI Provider Switcher (Anti-Slop) --- */
+.ai-provider-switcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.ai-provider-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-snappy);
+  user-select: none;
+}
+
+.ai-provider-tab:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+
+.ai-provider-tab.is-active {
+  background-color: var(--accent-primary-soft);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.ai-provider-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.settings-theme-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.settings-theme-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-snappy);
+  user-select: none;
+}
+
+.settings-theme-pill:hover {
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+
+.settings-theme-pill.is-active {
+  background-color: var(--accent-primary-soft);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.settings-theme-pill input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.profile-history-details summary::-webkit-details-marker {
+  display: none;
+}
+
+
 

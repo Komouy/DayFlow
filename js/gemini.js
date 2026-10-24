@@ -105,19 +105,48 @@ export class GeminiService {
     return (APP_CONFIG.AI_PROXY_URL || '').trim().replace(/\/+$/, '');
   }
 
+
+  /**
+   * Returns active AI provider: 'gemini' | 'groq'
+   */
+  static getAiProvider() {
+    return state.getSettings().aiProvider || 'gemini';
+  }
+
+  static getGroqApiKey() {
+    const s = state.getSettings();
+    return (s.groqApiKey || s.grokApiKey || '').trim();
+  }
+
+  static getGroqModel() {
+    const s = state.getSettings();
+    if (s.groqModel) return s.groqModel;
+    const key = this.getGroqApiKey();
+    if (key.startsWith('xai-')) return 'grok-2-latest';
+    return APP_CONFIG.DEFAULT_GROQ_MODEL || 'llama-3.3-70b-versatile';
+  }
+
+  static getGroqApiUrl(key = '') {
+    if (key.startsWith('xai-')) {
+      return APP_CONFIG.GROK_API_URL || 'https://api.x.ai/v1/chat/completions';
+    }
+    return APP_CONFIG.GROQ_API_URL || 'https://api.groq.com/openai/v1/chat/completions';
+  }
+
+  // Backward compatibility alias
   static getGrokApiKey() {
-    return (state.getSettings().grokApiKey || '').trim();
+    return this.getGroqApiKey();
   }
 
   static getGrokModel() {
-    return state.getSettings().grokModel || APP_CONFIG.DEFAULT_GROK_MODEL || 'grok-2-latest';
+    return this.getGroqModel();
   }
 
   /**
-   * Returns true if AI is operational (either via secure proxy, Gemini key, or Grok key)
+   * Returns true if AI is operational (either via secure proxy, Gemini key, or Groq key)
    */
   static isAiReady() {
-    return Boolean(this.getProxyUrl() || this.getApiKey() || this.getGrokApiKey());
+    return Boolean(this.getProxyUrl() || this.getApiKey() || this.getGroqApiKey());
   }
 
   static getModel() {
@@ -233,15 +262,16 @@ export class GeminiService {
   }
 
   /**
-   * Direct request to xAI Grok API (Chat Completions)
+   * Direct request to Groq API (GroqCloud / xAI Chat Completions)
    */
-  static async requestGrokGenerateContent(payload, grokKey = null) {
-    const key = (grokKey || this.getGrokApiKey()).trim();
+  static async requestGroqGenerateContent(payload, customKey = null) {
+    const key = (customKey || this.getGroqApiKey()).trim();
     if (!key) {
-      throw new Error('xAI Grok API Key belum diatur.');
+      throw new Error('Groq / Grok API Key belum diatur.');
     }
-    const apiUrl = APP_CONFIG.GROK_API_URL || 'https://api.x.ai/v1/chat/completions';
-    const grokPayload = this.convertGeminiPayloadToOpenAI(payload);
+    const apiUrl = this.getGroqApiUrl(key);
+    const model = this.getGroqModel();
+    const groqPayload = this.convertGeminiPayloadToOpenAI(payload, model);
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -249,12 +279,12 @@ export class GeminiService {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${key}`
       },
-      body: JSON.stringify(grokPayload)
+      body: JSON.stringify(groqPayload)
     });
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      const msg = errData?.error?.message || `Grok HTTP ${response.status}`;
+      const msg = errData?.error?.message || `Groq HTTP ${response.status}`;
       throw new Error(msg);
     }
 
@@ -262,113 +292,131 @@ export class GeminiService {
     return this.convertOpenAIToGeminiResponse(data);
   }
 
+  // Alias for backward compatibility
+  static async requestGrokGenerateContent(payload, key = null) {
+    return this.requestGroqGenerateContent(payload, key);
+  }
+
   /**
-   * Resilient request sender routing through Serverless Proxy or direct Google Gemini with auto-failover to Grok
+   * Resilient request sender routing through Serverless Proxy or direct engine (Gemini or Groq)
    */
   static async requestGenerateContent(payload) {
+    const activeProvider = this.getAiProvider(); // 'gemini' | 'groq'
     const apiKey = this.getApiKey();
     const proxyUrl = this.getProxyUrl();
     const userPersonalKey = (state.getSettings().apiKey || '').trim();
-    const grokKey = this.getGrokApiKey();
+    const groqKey = this.getGroqApiKey();
 
-    if (!apiKey && !proxyUrl && !grokKey) {
+    if (!apiKey && !proxyUrl && !groqKey) {
       throw new Error('Layanan AI belum siap. Konfigurasi AI Gateway atau masukkan API Key di Pengaturan.');
     }
 
-    // Direct to Grok if only Grok key is configured
-    if (!apiKey && !proxyUrl && grokKey) {
-      return await this.requestGrokGenerateContent(payload, grokKey);
-    }
+    // Helper: Execute direct or proxy call to Groq
+    const executeGroq = async () => {
+      if (groqKey) {
+        return await this.requestGroqGenerateContent(payload, groqKey);
+      }
+      if (proxyUrl) {
+        const response = await fetch(`${proxyUrl}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: 'groq',
+            payload: payload
+          })
+        });
+        if (response.ok) return await response.json();
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || `Proxy Groq HTTP ${response.status}`);
+      }
+      throw new Error('Groq API Key belum diatur.');
+    };
 
-    const primaryModel = this.getModel();
-    const candidateModels = [primaryModel, 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'].filter((v, i, a) => a.indexOf(v) === i);
+    // Helper: Execute direct or proxy call to Gemini
+    const executeGemini = async () => {
+      const primaryModel = this.getModel();
+      const candidateModels = [primaryModel, 'gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash'].filter((v, i, a) => a.indexOf(v) === i);
+      let lastGeminiErr = null;
 
-    let lastError = null;
-
-    // Mode 1: Centralized Serverless Proxy (when proxy is set and user hasn't overridden with their own personal key)
-    if (proxyUrl && !userPersonalKey) {
-      for (const model of candidateModels) {
-        try {
-          const response = await fetch(`${proxyUrl}/api/generate`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              model: model,
-              payload: payload
-            })
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (model !== primaryModel) {
-              state.updateSettings({ geminiModel: model });
+      if (proxyUrl && !userPersonalKey) {
+        for (const model of candidateModels) {
+          try {
+            const response = await fetch(`${proxyUrl}/api/generate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                provider: 'gemini',
+                model: model,
+                payload: payload
+              })
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (model !== primaryModel) state.updateSettings({ geminiModel: model });
+              return data;
             }
-            return data;
+            const errData = await response.json().catch(() => ({}));
+            const status = response.status;
+            lastGeminiErr = new Error(errData?.error?.message || `Proxy HTTP ${status}`);
+            if (status === 400 || status === 403) break;
+          } catch (err) {
+            lastGeminiErr = err;
           }
-
-          const errData = await response.json().catch(() => ({}));
-          const status = response.status;
-          const msg = errData?.error?.message || `Proxy HTTP ${status}`;
-          lastError = new Error(msg);
-
-          if (status === 400 || status === 403) {
-            break;
+        }
+      } else if (apiKey) {
+        for (const model of candidateModels) {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+              body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (model !== primaryModel) state.updateSettings({ geminiModel: model });
+              return data;
+            }
+            const errData = await response.json().catch(() => ({}));
+            const status = response.status;
+            lastGeminiErr = new Error(errData?.error?.message || `HTTP ${status}`);
+            if (status === 400 || status === 403) break;
+          } catch (err) {
+            lastGeminiErr = err;
           }
-        } catch (err) {
-          lastError = err;
         }
       }
-    } else if (apiKey) {
-      // Mode 2: Direct Google Gemini (using personal API key or central fallback key)
-      for (const model of candidateModels) {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        try {
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey
-            },
-            body: JSON.stringify(payload)
-          });
+      throw lastGeminiErr || new Error('Gemini tidak tersedia.');
+    };
 
-          if (response.ok) {
-            const data = await response.json();
-            if (model !== primaryModel) {
-              state.updateSettings({ geminiModel: model });
-            }
-            return data;
-          }
-
-          const errData = await response.json().catch(() => ({}));
-          const status = response.status;
-          const msg = errData?.error?.message || `HTTP ${status}`;
-          lastError = new Error(msg);
-
-          // If client auth error, break out to allow Grok fallback
-          if (status === 400 || status === 403) {
-            break;
-          }
-        } catch (err) {
-          lastError = err;
-        }
-      }
-    }
-
-    // Auto-Failover to xAI Grok if configured and Gemini encountered errors
-    if (grokKey) {
+    // ROUTING BASED ON USER PROVIDER PREFERENCE:
+    if (activeProvider === 'groq') {
       try {
-        console.info('DayFlow AI: Mengalihkan permintaan ke xAI Grok (fallback engine)...');
-        return await this.requestGrokGenerateContent(payload, grokKey);
-      } catch (grokErr) {
-        console.warn('DayFlow AI: Grok fallback juga gagal:', grokErr);
-        throw new Error(`Gemini & Grok gagal: ${lastError?.message || 'Gemini kendala'} | ${grokErr.message}`);
+        return await executeGroq();
+      } catch (groqErr) {
+        console.warn('DayFlow AI: Groq gagal, mengalihkan ke Gemini...', groqErr);
+        try {
+          return await executeGemini();
+        } catch (geminiErr) {
+          throw new Error(`Groq gagal (${groqErr.message}) & Gemini fallback gagal (${geminiErr.message})`);
+        }
+      }
+    } else {
+      // Default: Gemini primary, Groq fallback
+      try {
+        return await executeGemini();
+      } catch (geminiErr) {
+        console.warn('DayFlow AI: Gemini kendala, mengalihkan ke Groq fallback...', geminiErr);
+        if (groqKey || proxyUrl) {
+          try {
+            return await executeGroq();
+          } catch (groqErr) {
+            throw new Error(`Gemini gagal (${geminiErr.message}) & Groq fallback gagal (${groqErr.message})`);
+          }
+        }
+        throw geminiErr;
       }
     }
-
-    throw lastError || new Error('Gagal memproses permintaan AI.');
   }
 
   /**
@@ -726,19 +774,49 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
   }
 
   /**
-   * Health/Test Ping for xAI Grok Connection
+   * Health/Test Ping for Groq / Grok Connection
    */
-  static async testGrokConnection(customKey = null) {
-    const keyToTest = (customKey !== null ? customKey : this.getGrokApiKey()).trim();
-    if (!keyToTest) {
-      throw new Error('Belum ada Grok API Key yang dimasukkan.');
-    }
+  static async testGroqConnection(customKey = null) {
+    const keyToTest = (customKey !== null ? customKey : this.getGroqApiKey()).trim();
     const testPayload = {
-      contents: [{ role: 'user', parts: [{ text: 'Halo, konfirmasi siap dalam 1 kata.' }] }],
+      contents: [{ role: 'user', parts: [{ text: 'Konfirmasi siap dalam 1 kata.' }] }],
       generationConfig: { maxOutputTokens: 20 }
     };
-    const res = await this.requestGrokGenerateContent(testPayload, keyToTest);
-    return { success: true, mode: 'grok', model: this.getGrokModel(), data: res };
+
+    if (keyToTest) {
+      const res = await this.requestGroqGenerateContent(testPayload, keyToTest);
+      const isXai = keyToTest.startsWith('xai-');
+      return {
+        success: true,
+        mode: 'groq-direct',
+        model: this.getGroqModel(),
+        provider: isXai ? 'xAI Grok' : 'GroqCloud',
+        data: res
+      };
+    }
+
+    if (this.getProxyUrl()) {
+      const response = await fetch(`${this.getProxyUrl()}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'groq',
+          payload: testPayload
+        })
+      });
+      if (response.ok) {
+        return { success: true, mode: 'proxy-groq', model: this.getGroqModel(), provider: 'Groq via Gateway' };
+      }
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Gateway Groq HTTP ${response.status}`);
+    }
+
+    throw new Error('Belum ada Groq API Key atau Gateway yang terhubung.');
+  }
+
+  // Alias for backward compatibility
+  static async testGrokConnection(key = null) {
+    return this.testGroqConnection(key);
   }
 
   /**

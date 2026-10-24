@@ -2537,6 +2537,14 @@ select.input-control option {
   font-size: 11px;
   line-height: 1.4;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-live-context-bar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .chat-context-pill {
@@ -2624,6 +2632,14 @@ select.input-control option {
   padding: 4px 2px 8px 2px;
   white-space: nowrap;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chat-followup-chips::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .chat-followup-chips.hidden {
@@ -2787,96 +2803,204 @@ select.input-control option {
   transform: scale(0.97);
 }
 
-/* Mobile Pinned AI Chat Viewport (Zero Scroll, Always Fixed Input) */
+/* Mobile Pinned AI Chat Viewport (Zero Scroll, Always Fixed Input, Zero Collision) */
 @media (max-width: 767px) {
-  body.tab-ai-plan {
+  body.tab-ai-plan,
+  body:has(#view-ai-plan:not(.hidden)) {
     overflow: hidden !important;
     height: 100dvh !important;
     height: 100vh !important;
+    max-height: 100dvh !important;
   }
 
-  body.tab-ai-plan #app-root {
-    height: 100dvh;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  body.tab-ai-plan #app-root,
+  body:has(#view-ai-plan:not(.hidden)) #app-root {
+    height: 100dvh !important;
+    height: 100vh !important;
+    max-height: 100dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    position: relative !important;
   }
 
-  body.tab-ai-plan .app-header {
-    flex-shrink: 0;
+  body.tab-ai-plan .app-header,
+  body:has(#view-ai-plan:not(.hidden)) .app-header {
+    flex-shrink: 0 !important;
   }
 
-  body.tab-ai-plan .main-viewport {
-    flex: 1;
-    min-height: 0;
-    height: calc(100dvh - 54px - 64px);
-    height: calc(100vh - 54px - 64px);
-    max-height: calc(100dvh - 54px - 64px);
-    max-height: calc(100vh - 54px - 64px);
-    padding: var(--space-2) var(--space-3) 4px;
-    padding-bottom: 4px !important;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+  /* Explicit locked mobile bottom nav height with safe-area adaptation */
+  .bottom-nav {
+    height: calc(64px + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+    padding-top: 6px !important;
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  body.tab-ai-plan #view-ai-plan {
-    flex: 1;
-    min-height: 0;
-    height: 100%;
-    max-height: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    overflow: hidden;
+  .bottom-nav .nav-tab {
+    min-height: 44px !important;
+    padding: 2px 0 !important;
+    gap: 2px !important;
   }
 
-  body.tab-ai-plan #view-ai-plan .page-control-bar {
-    flex-shrink: 0;
-    margin-bottom: 0;
-    padding-bottom: 0;
+  .bottom-nav .nav-tab-label {
+    font-size: 10.5px !important;
   }
 
-  body.tab-ai-plan .ai-chat-card {
-    flex: 1;
-    min-height: 0;
-    height: 100%;
-    max-height: 100%;
-    padding: var(--space-2) var(--space-3);
-    margin-bottom: 0;
-    gap: 6px;
+  /* Main viewport flex-bounds: stops cleanly above bottom-nav with zero collision */
+  body.tab-ai-plan .main-viewport,
+  body:has(#view-ai-plan:not(.hidden)) .main-viewport {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 6px 10px 0 !important;
+    padding-bottom: 0 !important;
+    margin-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    box-sizing: border-box !important;
   }
 
-  body.tab-ai-plan .quick-prompts {
-    flex-shrink: 0;
-    margin-bottom: 2px;
+  body.tab-ai-plan #view-ai-plan,
+  body:has(#view-ai-plan:not(.hidden)) #view-ai-plan {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  body.tab-ai-plan .chat-history {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+  body.tab-ai-plan #view-ai-plan .page-control-bar,
+  body:has(#view-ai-plan:not(.hidden)) #view-ai-plan .page-control-bar {
+    flex-shrink: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 2px 2px 0 !important;
+    min-height: unset !important;
+  }
+
+  body.tab-ai-plan .chat-live-context-bar,
+  body:has(#view-ai-plan:not(.hidden)) .chat-live-context-bar {
+    flex-shrink: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    gap: 6px !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  body.tab-ai-plan .chat-live-context-bar::-webkit-scrollbar,
+  body:has(#view-ai-plan:not(.hidden)) .chat-live-context-bar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  body.tab-ai-plan .ai-chat-card,
+  body:has(#view-ai-plan:not(.hidden)) .ai-chat-card {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 8px 10px !important;
+    margin-bottom: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  body.tab-ai-plan .quick-prompts,
+  body:has(#view-ai-plan:not(.hidden)) .quick-prompts {
+    flex-shrink: 0 !important;
+    margin-bottom: 2px !important;
+    padding-bottom: 2px !important;
+  }
+
+  body.tab-ai-plan .chat-history,
+  body:has(#view-ai-plan:not(.hidden)) .chat-history {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
     -webkit-overflow-scrolling: touch;
-    padding-right: 2px;
+    padding-right: 2px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
   }
 
-  body.tab-ai-plan .chat-bottom-dock {
-    flex-shrink: 0;
-    padding-top: 6px;
-    padding-bottom: 2px;
+  body.tab-ai-plan .chat-followup-chips,
+  body:has(#view-ai-plan:not(.hidden)) .chat-followup-chips {
+    flex-shrink: 0 !important;
+    padding: 2px 0 4px !important;
+    margin-bottom: 0 !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
 
-  body.tab-ai-plan .chat-input-bar {
-    padding: 4px 6px;
+  body.tab-ai-plan .chat-followup-chips::-webkit-scrollbar,
+  body:has(#view-ai-plan:not(.hidden)) .chat-followup-chips::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
   }
 
-  body.tab-ai-plan .chat-input {
-    font-size: 14px;
-    padding: 6px 8px;
-    min-height: 38px;
+  body.tab-ai-plan .chat-bottom-dock,
+  body:has(#view-ai-plan:not(.hidden)) .chat-bottom-dock {
+    flex-shrink: 0 !important;
+    padding: 5px 0 2px !important;
+    margin-top: auto !important;
+    border-top: 1px solid var(--border-subtle) !important;
+    background-color: var(--bg-surface) !important;
+    gap: 4px !important;
+  }
+
+  body.tab-ai-plan .chat-dock-meta,
+  body:has(#view-ai-plan:not(.hidden)) .chat-dock-meta {
+    padding: 0 2px 2px !important;
+  }
+
+  body.tab-ai-plan .chat-auto-save-control,
+  body:has(#view-ai-plan:not(.hidden)) .chat-auto-save-control {
+    font-size: 11.5px !important;
+  }
+
+  body.tab-ai-plan .chat-attachment-preview,
+  body:has(#view-ai-plan:not(.hidden)) .chat-attachment-preview {
+    margin-bottom: 4px !important;
+  }
+
+  body.tab-ai-plan .chat-input-bar,
+  body:has(#view-ai-plan:not(.hidden)) .chat-input-bar {
+    padding: 4px 6px !important;
+    gap: 4px !important;
+  }
+
+  body.tab-ai-plan .chat-input,
+  body:has(#view-ai-plan:not(.hidden)) .chat-input {
+    font-size: 13.5px !important;
+    padding: 6px 8px !important;
+    min-height: 38px !important;
+  }
+
+  body.tab-ai-plan .btn-send-chat,
+  body:has(#view-ai-plan:not(.hidden)) .btn-send-chat,
+  body.tab-ai-plan #chat-submit-btn,
+  body:has(#view-ai-plan:not(.hidden)) #chat-submit-btn {
+    min-width: 38px !important;
+    height: 38px !important;
+    padding: 0 !important;
   }
 }
 

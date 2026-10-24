@@ -7,7 +7,7 @@
 if ('caches' in window) {
   caches.keys().then(function(keys) {
     keys.forEach(function(k) {
-      if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v7.0') {
+      if (k.indexOf('dayflow-') === 0 && k !== 'dayflow-v7.3') {
         console.log('[DayFlow] Purging obsolete cache:', k);
         caches.delete(k);
       }
@@ -46,6 +46,7 @@ window.dayflowApp = {
       document.querySelectorAll('.modal-overlay').forEach(function(m) {
         m.classList.remove('open');
       });
+      document.body.classList.toggle('tab-ai-plan', tab === 'ai-plan');
       window._dfBuffer.push(['switchTab', tab]);
     }
   },

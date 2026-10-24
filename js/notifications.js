@@ -26,7 +26,7 @@ class NotificationService {
     this._stateSubscribed = true;
     try {
       state.subscribe((event) => {
-        if (event === 'schedule:added' || event === 'schedule:updated' || event === 'schedules:reset') {
+        if (event === 'schedule:added' || event === 'schedules:batch-added' || event === 'schedule:updated' || event === 'schedules:reset') {
           this._checkUpcomingSchedules();
         }
       });
@@ -264,7 +264,7 @@ class NotificationService {
         this.showToast('Izin notifikasi berhasil diaktifkan!', 'success');
         this.playChime();
         this.sendSystemNotification('DayFlow • Notifikasi Aktif', {
-          body: '🔔 Notifikasi pengingat agenda DayFlow siap muncul di layarmu.',
+          body: 'Notifikasi pengingat agenda DayFlow siap muncul di layarmu.',
           tag: 'dayflow_perm_granted'
         });
         state.notify('notifications:permission-changed', 'granted');
@@ -368,7 +368,7 @@ class NotificationService {
     }
 
     // 3. Show in-app Toast
-    this.showToast(`🔔 Uji Notifikasi: Bel ${toneName} berbunyi.`, 'info', 4500);
+    this.showToast(`Uji Notifikasi: Bel ${toneName} berbunyi.`, 'info', 4500);
 
     // 4. Check system notification permission
     if (!('Notification' in window)) {
@@ -388,7 +388,7 @@ class NotificationService {
 
     // 5. Send actual OS / system Web Notification
     const res = await this.sendSystemNotification('DayFlow • Notifikasi Berfungsi Normal!', {
-      body: `🔔 Pengingat jadwal dan bunyi bel ${toneName} aktif. Siap mengingatkan agenda harianmu!`,
+      body: `Pengingat jadwal dan bunyi bel ${toneName} aktif. Siap mengingatkan agenda harianmu!`,
       tag: 'dayflow_test_notification',
       renotify: true
     });

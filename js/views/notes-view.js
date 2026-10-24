@@ -8,6 +8,7 @@ import { getIcon, renderIcons } from '../icons.js';
 import { GeminiService } from '../gemini.js';
 import { notifications } from '../notifications.js';
 import { escapeHtml } from '../utils/helpers.js';
+import { springBounce } from '../animations.js';
 
 export const notesViewMethods = {
   setupNotesDelegation(containerEl) {
@@ -72,35 +73,47 @@ export const notesViewMethods = {
     }
 
     if (filtered.length === 0) {
+      const isSearching = Boolean(filterQuery);
       listEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-state-icon">${getIcon('file-text', '', 20)}</div>
-          <p class="empty-state-title">Belum ada catatan</p>
-          <p class="empty-state-desc">Catat ide cepat, ringkasan rapat, atau memo harian di sini.</p>
+          <div class="empty-state-icon">${getIcon(isSearching ? 'search' : 'file-text', '', 20)}</div>
+          <p class="empty-state-title">${isSearching ? 'Catatan tidak ditemukan' : 'Belum ada catatan'}</p>
+          <p class="empty-state-desc">${isSearching ? 'Coba gunakan kata kunci lain untuk mencari ide atau memo.' : 'Catat ide cepat, ringkasan rapat, atau memo harian di sini.'}</p>
+          ${!isSearching ? `
+            <div class="empty-state-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="btn-empty-add-note">
+                ${getIcon('plus', '', 14)} Buat Catatan Baru
+              </button>
+            </div>
+          ` : ''}
         </div>
       `;
       renderIcons(listEl);
+
+      const addNoteBtn = listEl.querySelector('#btn-empty-add-note');
+      if (addNoteBtn) {
+        addNoteBtn.addEventListener('click', () => {
+          springBounce(addNoteBtn);
+          this.openNoteModal();
+        });
+      }
       return;
     }
 
     listEl.innerHTML = filtered.map(note => {
       const dateObj = (note.updatedAt && !isNaN(new Date(note.updatedAt).getTime())) ? new Date(note.updatedAt) : new Date();
-      const dateStr = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const dateStr = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 
       return `
-      <div class="note-card" data-note-id="${note.id}">
+      <div class="note-card" data-note-id="${note.id}" role="button" tabindex="0" title="Klik untuk membuka catatan">
         <div class="note-card-title">${escapeHtml(note.title || 'Catatan Tanpa Judul')}</div>
         <div class="note-card-preview">${escapeHtml(note.content || '')}</div>
         <div class="note-card-footer">
-          <span>${dateStr}</span>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-ghost btn-sm" data-action="edit-note" data-id="${note.id}" aria-label="Ubah catatan">
-              ${getIcon('edit', '', 14)}
-            </button>
-            <button class="btn btn-ghost btn-sm text-muted" data-action="delete-note" data-id="${note.id}" aria-label="Hapus catatan">
-              ${getIcon('trash', '', 14)}
-            </button>
-          </div>
+          <span class="text-xs text-muted">${dateStr}</span>
+          <button class="btn btn-ghost btn-xs text-muted" data-action="delete-note" data-id="${note.id}" aria-label="Hapus catatan" title="Hapus catatan">
+            ${getIcon('trash', '', 13)}
+          </button>
+        </div>
       </div>
       `;
     }).join('');
@@ -118,26 +131,26 @@ export const notesViewMethods = {
       });
     }
 
-    // AI Notes Search button
+    // AI Notes Search / Summary button
     const btnAiSearch = document.getElementById('btn-ai-search-notes');
     if (btnAiSearch) {
       btnAiSearch.onclick = async () => {
         const query = searchInput ? searchInput.value.trim() : '';
         if (!query) {
-          notifications.showToast('Masukkan kata kunci pencarian terlebih dahulu.', 'warning');
+          notifications.showToast('Ketik topik atau kata kunci terlebih dahulu.', 'warning');
           return;
         }
 
         btnAiSearch.disabled = true;
-        btnAiSearch.innerHTML = `<span class="spinner"></span> Mencari...`;
+        btnAiSearch.innerHTML = `<span class="spinner"></span> Merangkum...`;
         try {
           const result = await GeminiService.searchNotesWithAI(query, state.getNotes());
-          notifications.showToast(`Temuan AI: ${result}`, 'info', 6000);
+          notifications.showToast(`Rangkuman AI: ${result}`, 'info', 6000);
         } catch (err) {
           notifications.showToast(err.message, 'error');
         } finally {
           btnAiSearch.disabled = false;
-          btnAiSearch.innerHTML = `${getIcon('search', '', 14)} Cari`;
+          btnAiSearch.innerHTML = `${getIcon('bot', '', 14)} Rangkum AI`;
           renderIcons();
         }
       };

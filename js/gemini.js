@@ -28,10 +28,12 @@ Karakteristik & Aturan Wajib:
 6. Konteks waktu saat ini: {CURRENT_DATETIME}.
 7. Jadwal yang sudah ada hari ini:
 {TODAY_SCHEDULES}
-8. Tugas penting dengan tenggat/deadline mendatang:
+8. Jadwal aktif tersimpan di DayFlow:
+{SAVED_SCHEDULES}
+9. Tugas penting dengan tenggat/deadline mendatang:
 {DEADLINE_TASKS}
 Jika pengguna meminta bantuan mencicil tugas deadline (misalnya tugas deadline hari Minggu), berikan pemecahan sub-task taktis dan alokasi waktu yang realistis agar tidak menumpuk.
-9. AKSI PENJADWALAN CERDAS (ACTIONABLE SCHEDULE EXECUTION):
+10. AKSI PENJADWALAN CERDAS (ACTIONABLE SCHEDULE EXECUTION):
 Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan (contoh: "jadwalkan besok jam 8 koding", "setiap hari jam 6 pagi lari santai", "ingatkan kumpul tugas hari senin jam 5 sore", atau informasi perkuliahan/kegiatan seperti "jadwal kuliah DDP jam 08.00 - selesai"):
 - Tuliskan jawaban percakapan yang ramah, ringkas, dan jelas dalam Bahasa Indonesia.
 - DI BAGIAN PALING AKHIR responmu, sertakan blok JSON kegiatan terstruktur di dalam tag khusus:
@@ -58,7 +60,7 @@ Aturan penting tag [DAYFLOW_SCHEDULES]:
 - Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
 - JANGAN PERNAH menambahkan kegiatan fiktif/pengisi (seperti istirahat/persiapan) yang tidak diminta!
 
-10. AKSI PEMBUATAN CATATAN OTOMATIS (ACTIONABLE NOTE EXECUTION):
+11. AKSI PEMBUATAN CATATAN OTOMATIS (ACTIONABLE NOTE EXECUTION):
 Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi/foto papan tulis/notula rapat yang cocok disimpan sebagai catatan:
 - Sertakan blok JSON catatan terstruktur di dalam tag:
 [DAYFLOW_NOTE]
@@ -68,7 +70,7 @@ Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi
 }
 [/DAYFLOW_NOTE]
 
-11. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
+12. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
 Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akademik, silabus, foto papan tulis/catatan, poster event, atau screenshot kalender) atau berkas dokumen (PDF, TXT, CSV, ICS):
 - Teliti dan analisis seluruh teks dan informasi visual yang tertera di dalamnya secara cermat.
 - JIKA BERISI JADWAL/ACARA/DEADLINE:
@@ -83,6 +85,13 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
 - JIKA BERISI RINGKASAN MATERI/NOTULA/CATATAN TUGAS:
   * Berikan penjelasan penting.
   * WAJIB sertakan tag [DAYFLOW_NOTE] agar pengguna bisa langsung menyimpannya ke Catatan DayFlow dalam 1 klik.
+
+13. PENANGANAN REVISI / PERUBAHAN JADWAL TERDAHULU (UPDATE & RESCHEDULING):
+Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan kegiatan, atau pembatalan dari jadwal yang sebelumnya sudah diberikan atau jadwal yang tersimpan:
+- KONSISTENSI & ANTI-HALUSINASI: Pertahankan seluruh mata kuliah / kegiatan lain yang tidak diminta diubah secara utuh. Dilarang merombak, menghilangkan, atau menambah kegiatan lain tanpa instruksi eksplisit pengguna.
+- MODIFIKASI PRESISI: Hanya ubah parameter yang diminta pengguna (contoh: jika pengguna meminta "geser kuliah Kalkulus ke jam 13:00", maka ubah jam Kalkulus menjadi 13:00, sedangkan kegiatan hari lainnya tetap utuh).
+- KEMBALIKAN DAFTAR LENGKAP TERBARU: Di akhir jawaban, WAJIB sertakan blok [DAYFLOW_SCHEDULES] berisi SELURUH jadwal versi terbaru (kombinasi kegiatan yang tidak berubah + kegiatan yang sudah diperbaiki), agar antarmuka DayFlow langsung menyajikan jadwal teranyar secara komprehensif.
+- Jelaskan secara ringkas dan ramah perubahan apa saja yang berhasil disesuaikan.
 `;
 
 export class GeminiService {
@@ -96,11 +105,19 @@ export class GeminiService {
     return (APP_CONFIG.AI_PROXY_URL || '').trim().replace(/\/+$/, '');
   }
 
+  static getGrokApiKey() {
+    return (state.getSettings().grokApiKey || '').trim();
+  }
+
+  static getGrokModel() {
+    return state.getSettings().grokModel || APP_CONFIG.DEFAULT_GROK_MODEL || 'grok-2-latest';
+  }
+
   /**
-   * Returns true if AI is operational (either via secure proxy or API key)
+   * Returns true if AI is operational (either via secure proxy, Gemini key, or Grok key)
    */
   static isAiReady() {
-    return Boolean(this.getProxyUrl() || this.getApiKey());
+    return Boolean(this.getProxyUrl() || this.getApiKey() || this.getGrokApiKey());
   }
 
   static getModel() {
@@ -110,6 +127,7 @@ export class GeminiService {
   static buildSystemPrompt() {
     const todaySchedules = state.getTodaySchedules();
     const deadlineTasks = state.getDeadlineTasks();
+    const allSchedules = state.getSchedules();
     const now = new Date();
     const timeStr = now.toLocaleDateString('id-ID', {
       weekday: 'long',
@@ -126,22 +144,140 @@ export class GeminiService {
       ? deadlineTasks.map(s => `- Tugas: "${s.title}" (Tenggat: ${s.deadline}, Prioritas: ${s.priority || 'medium'})`).join('\n')
       : '(Tidak ada tugas dengan tenggat khusus)';
 
+    const activeListText = allSchedules.length > 0
+      ? allSchedules.slice(0, 30).map(s => `- [${s.date} | ${s.time} | Durasi: ${s.duration}m | Perulangan: ${s.recurrence || 'none'}] ${s.title}${s.description ? ' (' + s.description + ')' : ''}`).join('\n')
+      : '(Belum ada jadwal tersimpan di sistem)';
+
     return SYSTEM_INSTRUCTION_BASE
       .replace('{CURRENT_DATETIME}', timeStr)
       .replace('{TODAY_SCHEDULES}', scheduleListText)
+      .replace('{SAVED_SCHEDULES}', activeListText)
       .replace('{DEADLINE_TASKS}', deadlineListText);
   }
 
   /**
-   * Resilient request sender routing through Serverless Proxy or direct Google Gemini with auto-failover
+   * Adapts Gemini payload format into OpenAI / xAI Grok compatible format
+   */
+  static convertGeminiPayloadToOpenAI(payload, model = null) {
+    const messages = [];
+
+    // Extract system instruction if present
+    const systemParts = payload.systemInstruction?.parts || [];
+    const systemText = systemParts.map(p => p.text).filter(Boolean).join('\n\n');
+    if (systemText) {
+      messages.push({ role: 'system', content: systemText });
+    }
+
+    // Process contents array
+    if (Array.isArray(payload.contents)) {
+      payload.contents.forEach(turn => {
+        const role = (turn.role === 'model' || turn.role === 'assistant') ? 'assistant' : 'user';
+        const parts = Array.isArray(turn.parts) ? turn.parts : [];
+
+        const hasImage = parts.some(p => p.inlineData && p.inlineData.data);
+        if (hasImage) {
+          const contentList = [];
+          parts.forEach(p => {
+            if (p.inlineData && p.inlineData.data) {
+              const mime = p.inlineData.mimeType || 'image/jpeg';
+              contentList.push({
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mime};base64,${p.inlineData.data}`
+                }
+              });
+            } else if (p.text) {
+              contentList.push({
+                type: 'text',
+                text: p.text
+              });
+            }
+          });
+          messages.push({ role, content: contentList });
+        } else {
+          const combinedText = parts.map(p => p.text).filter(Boolean).join('\n\n');
+          if (combinedText) {
+            messages.push({ role, content: combinedText });
+          }
+        }
+      });
+    }
+
+    const grokModel = model || this.getGrokModel();
+    return {
+      model: grokModel,
+      messages,
+      temperature: payload.generationConfig?.temperature ?? 0.4,
+      max_tokens: payload.generationConfig?.maxOutputTokens ?? 4096
+    };
+  }
+
+  /**
+   * Adapts OpenAI / xAI Grok response into Gemini response format
+   */
+  static convertOpenAIToGeminiResponse(grokData) {
+    const text = grokData?.choices?.[0]?.message?.content || '';
+    return {
+      candidates: [
+        {
+          content: {
+            parts: [{ text }],
+            role: 'model'
+          },
+          finishReason: 'STOP'
+        }
+      ],
+      provider: 'grok',
+      model: grokData?.model || 'grok-2-latest'
+    };
+  }
+
+  /**
+   * Direct request to xAI Grok API (Chat Completions)
+   */
+  static async requestGrokGenerateContent(payload, grokKey = null) {
+    const key = (grokKey || this.getGrokApiKey()).trim();
+    if (!key) {
+      throw new Error('xAI Grok API Key belum diatur.');
+    }
+    const apiUrl = APP_CONFIG.GROK_API_URL || 'https://api.x.ai/v1/chat/completions';
+    const grokPayload = this.convertGeminiPayloadToOpenAI(payload);
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`
+      },
+      body: JSON.stringify(grokPayload)
+    });
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const msg = errData?.error?.message || `Grok HTTP ${response.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await response.json();
+    return this.convertOpenAIToGeminiResponse(data);
+  }
+
+  /**
+   * Resilient request sender routing through Serverless Proxy or direct Google Gemini with auto-failover to Grok
    */
   static async requestGenerateContent(payload) {
     const apiKey = this.getApiKey();
     const proxyUrl = this.getProxyUrl();
     const userPersonalKey = (state.getSettings().apiKey || '').trim();
+    const grokKey = this.getGrokApiKey();
 
-    if (!apiKey && !proxyUrl) {
+    if (!apiKey && !proxyUrl && !grokKey) {
       throw new Error('Layanan AI belum siap. Konfigurasi AI Gateway atau masukkan API Key di Pengaturan.');
+    }
+
+    // Direct to Grok if only Grok key is configured
+    if (!apiKey && !proxyUrl && grokKey) {
+      return await this.requestGrokGenerateContent(payload, grokKey);
     }
 
     const primaryModel = this.getModel();
@@ -178,54 +314,57 @@ export class GeminiService {
           lastError = new Error(msg);
 
           if (status === 400 || status === 403) {
-            throw lastError;
+            break;
           }
         } catch (err) {
-          if (err.message && (err.message.includes('API_KEY_INVALID') || err.message.includes('403'))) {
-            throw err;
-          }
           lastError = err;
         }
       }
+    } else if (apiKey) {
+      // Mode 2: Direct Google Gemini (using personal API key or central fallback key)
+      for (const model of candidateModels) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(payload)
+          });
 
-      throw lastError || new Error('Gagal menghubungi Serverless AI Proxy.');
+          if (response.ok) {
+            const data = await response.json();
+            if (model !== primaryModel) {
+              state.updateSettings({ geminiModel: model });
+            }
+            return data;
+          }
+
+          const errData = await response.json().catch(() => ({}));
+          const status = response.status;
+          const msg = errData?.error?.message || `HTTP ${status}`;
+          lastError = new Error(msg);
+
+          // If client auth error, break out to allow Grok fallback
+          if (status === 400 || status === 403) {
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+        }
+      }
     }
 
-    // Mode 2: Direct Google Gemini (using personal API key or central fallback key)
-    for (const model of candidateModels) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    // Auto-Failover to xAI Grok if configured and Gemini encountered errors
+    if (grokKey) {
       try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (model !== primaryModel) {
-            state.updateSettings({ geminiModel: model });
-          }
-          return data;
-        }
-
-        const errData = await response.json().catch(() => ({}));
-        const status = response.status;
-        const msg = errData?.error?.message || `HTTP ${status}`;
-        lastError = new Error(msg);
-
-        // If client auth error, stop immediately
-        if (status === 400 || status === 403) {
-          throw lastError;
-        }
-      } catch (err) {
-        if (err.message && (err.message.includes('API_KEY_INVALID') || err.message.includes('403'))) {
-          throw err;
-        }
-        lastError = err;
+        console.info('DayFlow AI: Mengalihkan permintaan ke xAI Grok (fallback engine)...');
+        return await this.requestGrokGenerateContent(payload, grokKey);
+      } catch (grokErr) {
+        console.warn('DayFlow AI: Grok fallback juga gagal:', grokErr);
+        throw new Error(`Gemini & Grok gagal: ${lastError?.message || 'Gemini kendala'} | ${grokErr.message}`);
       }
     }
 
@@ -584,6 +723,99 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
 
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || `Serverless Proxy HTTP ${res.status}`);
+  }
+
+  /**
+   * Health/Test Ping for xAI Grok Connection
+   */
+  static async testGrokConnection(customKey = null) {
+    const keyToTest = (customKey !== null ? customKey : this.getGrokApiKey()).trim();
+    if (!keyToTest) {
+      throw new Error('Belum ada Grok API Key yang dimasukkan.');
+    }
+    const testPayload = {
+      contents: [{ role: 'user', parts: [{ text: 'Halo, konfirmasi siap dalam 1 kata.' }] }],
+      generationConfig: { maxOutputTokens: 20 }
+    };
+    const res = await this.requestGrokGenerateContent(testPayload, keyToTest);
+    return { success: true, mode: 'grok', model: this.getGrokModel(), data: res };
+  }
+
+  /**
+   * AI Schedule Conflict Resolver
+   * Resolves schedule collisions by adjusting start times intelligently.
+   * Anti-Slop: Zero emojis, structured JSON response.
+   */
+  static async resolveScheduleConflicts(conflictsMap, daySchedules, targetDate) {
+    const conflictItems = [];
+    const fixedItems = [];
+
+    daySchedules.forEach(s => {
+      if (conflictsMap.has(s.id)) {
+        const info = conflictsMap.get(s.id);
+        conflictItems.push({
+          id: s.id,
+          title: s.title,
+          time: s.time,
+          duration: s.duration || 30,
+          priority: s.priority || 'medium',
+          category: s.category || 'Fokus',
+          conflictWith: info.otherTitle,
+          overlapMinutes: info.overlapMinutes
+        });
+      } else {
+        fixedItems.push({
+          id: s.id,
+          title: s.title,
+          time: s.time,
+          duration: s.duration || 30
+        });
+      }
+    });
+
+    if (conflictItems.length === 0) return [];
+
+    const prompt = `
+Kamu adalah DayFlow AI Schedule Conflict Optimizer.
+Terdapat beberapa kegiatan yang saling bertabrakan (overlapping) pada tanggal ${targetDate}.
+
+Daftar Kegiatan yang Mengalami Bentrok:
+${JSON.stringify(conflictItems, null, 2)}
+
+Daftar Kegiatan Lain Hari Ini (Waktu Tetap / Jangan Ditabrak):
+${JSON.stringify(fixedItems, null, 2)}
+
+Instruksi Optimasi:
+1. Analisis prioritas kegiatan (high/tinggi lebih didahulukan daripada low/rendah) dan durasinya.
+2. Geser waktu mulai ("newTime") kegiatan yang bertabrakan ke slot waktu luang terdekat di hari yang sama agar tidak saling bertabrakan dan tidak menabrak jadwal tetap lainnya.
+3. Berikan jeda 5-10 menit antar kegiatan bila memungkinkan. Dilarang mengubah durasi kegiatan.
+4. JANGAN MENGGUNAKAN EMOJI DALAM BENTUK APAPUN.
+5. Format keluaran HANYA berupa JSON Array valid persis seperti format berikut tanpa teks atau markdown lain:
+[
+  {
+    "id": "ID_KEGIATAN",
+    "title": "Judul Kegiatan",
+    "oldTime": "HH:MM",
+    "newTime": "HH:MM",
+    "reason": "Alasan singkat penyesuaian waktu tanpa emoji (maksimal 1 kalimat)"
+  }
+]
+`;
+
+    const data = await this.requestGenerateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1024 }
+    });
+
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '[]';
+    const cleanJson = raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    try {
+      const solutions = JSON.parse(cleanJson);
+      return Array.isArray(solutions) ? solutions : [];
+    } catch (e) {
+      console.error('Failed to parse AI conflict solutions:', raw, e);
+      throw new Error('AI gagal menghasilkan format solusi resolusi bentrok.');
+    }
   }
 }
 

@@ -22,7 +22,10 @@ export const settingsViewMethods = {
     const toneSelect = document.getElementById('setting-sound-tone');
     const proactiveToggle = document.getElementById('setting-proactive');
 
+    const grokInput = document.getElementById('setting-grok-api-key');
+
     if (apiInput) apiInput.value = settings.apiKey || '';
+    if (grokInput) grokInput.value = settings.grokApiKey || '';
     if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || 'gemini-2.5-flash';
     if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
 
@@ -34,6 +37,11 @@ export const settingsViewMethods = {
         badgeEl.style.color = '#ea580c';
         badgeEl.style.borderColor = 'rgba(234, 88, 12, 0.25)';
         badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ea580c; display:inline-block;"></span> Key Pribadi Aktif`;
+      } else if (settings.grokApiKey) {
+        badgeEl.style.background = 'rgba(14, 165, 233, 0.12)';
+        badgeEl.style.color = '#0ea5e9';
+        badgeEl.style.borderColor = 'rgba(14, 165, 233, 0.25)';
+        badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#0ea5e9; display:inline-block;"></span> AI + Grok Siap`;
       } else if (GeminiService.isAiReady()) {
         badgeEl.style.background = 'rgba(34, 197, 94, 0.12)';
         badgeEl.style.color = '#22c55e';
@@ -133,6 +141,8 @@ export const settingsViewMethods = {
 
     const systemNotifToggle = document.getElementById('setting-system-notif');
 
+    const grokInput = document.getElementById('setting-grok-api-key');
+
     state.updateSettings({
       userName: userNameInput ? userNameInput.value.trim() : '',
       heroBannerEnabled: bannerEnabledToggle ? bannerEnabledToggle.checked : false,
@@ -140,6 +150,7 @@ export const settingsViewMethods = {
       heroBannerQuote: bannerQuoteInput ? bannerQuoteInput.value.trim() : 'Fokus pada hal penting hari ini.',
       heroBannerUrl: bannerUrlInput ? bannerUrlInput.value.trim() : '',
       apiKey: apiInput ? apiInput.value.trim() : '',
+      grokApiKey: grokInput ? grokInput.value.trim() : '',
       geminiModel: modelSelect ? modelSelect.value : 'gemini-2.5-flash',
       notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : '15', 10) || 15,
       soundEnabled: soundToggle ? soundToggle.checked : true,
@@ -220,6 +231,43 @@ export const settingsViewMethods = {
     if (apiInput) apiInput.value = '';
     this.renderSettingsView();
     notifications.showToast('API Key pribadi telah dihapus dari peramban ini. DayFlow kini aktif menggunakan AI Terpusat.', 'success', 5000);
+  },
+
+  async handleTestGrokApiKey() {
+    const grokKey = document.getElementById('setting-grok-api-key')?.value.trim();
+    const testBtn = document.getElementById('btn-test-grok-api');
+    if (!grokKey) {
+      notifications.showToast('Masukkan xAI Grok API Key terlebih dahulu untuk menguji.', 'warning', 4000);
+      return;
+    }
+    const orig = testBtn ? testBtn.innerHTML : '';
+    if (testBtn) {
+      testBtn.disabled = true;
+      testBtn.innerHTML = `<span class="spinner"></span> Menguji...`;
+    }
+
+    try {
+      const res = await GeminiService.testGrokConnection(grokKey);
+      state.updateSettings({ grokApiKey: grokKey });
+      this.renderSettingsView();
+      notifications.showToast(`Koneksi xAI Grok valid dan siap sebagai fallback cadangan! (${res.model})`, 'success', 5000);
+    } catch (err) {
+      notifications.showToast(`Uji Grok gagal: ${err.message}`, 'error', 6000);
+    } finally {
+      if (testBtn) {
+        testBtn.disabled = false;
+        testBtn.innerHTML = orig;
+        renderIcons(testBtn);
+      }
+    }
+  },
+
+  handleClearGrokApiKey() {
+    state.updateSettings({ grokApiKey: '' });
+    const grokInput = document.getElementById('setting-grok-api-key');
+    if (grokInput) grokInput.value = '';
+    this.renderSettingsView();
+    notifications.showToast('Grok API Key cadangan telah dihapus dari peramban ini.', 'success', 5000);
   },
 
   handleExportData() {

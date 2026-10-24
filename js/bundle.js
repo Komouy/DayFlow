@@ -259,7 +259,9 @@
     heroBannerHeight: "normal",
     heroBannerOverlay: "medium",
     heroBannerQuote: "Fokus pada hal penting hari ini.",
-    chatAutoSave: false
+    chatAutoSave: false,
+    grokApiKey: "",
+    grokModel: "grok-2-latest"
   };
   var StateManager = class {
     constructor() {
@@ -389,6 +391,7 @@
       }
     }
     _load(key, fallback) {
+      if (typeof localStorage === "undefined") return fallback;
       try {
         const data = localStorage.getItem(key);
         if (!data) return fallback;
@@ -403,6 +406,7 @@
       }
     }
     _save(key, val) {
+      if (typeof localStorage === "undefined") return;
       try {
         localStorage.setItem(key, JSON.stringify(val));
       } catch (e) {
@@ -565,29 +569,62 @@
         const safeTitle = rawTitle || "Kegiatan Baru";
         const safeDate = normalizeDateString(item.date);
         const safeTime = normalizeTimeString(item.time);
-        const newSchedule = {
-          id: "sch_" + (baseTime + index) + "_" + Math.random().toString(36).substr(2, 6),
-          date: safeDate,
-          time: safeTime,
-          duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
-          title: safeTitle,
-          description: safeDescription,
-          category: item.category && typeof item.category === "string" ? item.category.trim() : item.kategori || "Fokus",
-          priority: ["low", "medium", "high"].includes(item.priority) ? item.priority : "medium",
-          deadline: item.deadline ? normalizeDateString(item.deadline) : null,
-          reminder: item.reminder !== false,
-          recurrence: ["none", "daily", "weekdays", "weekly", "monthly"].includes(item.recurrence) ? item.recurrence : "none",
-          completedDates: Array.isArray(item.completedDates) ? item.completedDates : [],
-          completed: !!item.completed,
-          createdAt: baseTime + index
-        };
-        newSchedules.push(newSchedule);
+        const cleanNormTitle = (t) => String(t || "").toLowerCase().replace(/^(?:kuliah|mata\s+kuliah|matkul)\s+/i, "").replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
+        const incomingNorm = cleanNormTitle(safeTitle);
+        const existingIdx = this.schedules.findIndex((existing) => {
+          if (!existing || typeof existing !== "object") return false;
+          if (item.id && existing.id === item.id) return true;
+          const existNorm = cleanNormTitle(existing.title);
+          if (existNorm && existNorm === incomingNorm) {
+            if (existing.date === safeDate) return true;
+            if (existing.recurrence === "weekly" && item.recurrence === "weekly") {
+              const eDay = (/* @__PURE__ */ new Date(existing.date + "T00:00:00")).getDay();
+              const iDay = (/* @__PURE__ */ new Date(safeDate + "T00:00:00")).getDay();
+              if (eDay === iDay) return true;
+            }
+          }
+          return false;
+        });
+        if (existingIdx !== -1) {
+          this.schedules[existingIdx] = {
+            ...this.schedules[existingIdx],
+            date: safeDate,
+            time: safeTime,
+            duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
+            title: safeTitle,
+            description: safeDescription || this.schedules[existingIdx].description,
+            category: item.category && typeof item.category === "string" ? item.category.trim() : this.schedules[existingIdx].category || "Fokus",
+            priority: ["low", "medium", "high"].includes(item.priority) ? item.priority : this.schedules[existingIdx].priority,
+            deadline: item.deadline ? normalizeDateString(item.deadline) : this.schedules[existingIdx].deadline,
+            recurrence: ["none", "daily", "weekdays", "weekly", "monthly"].includes(item.recurrence) ? item.recurrence : this.schedules[existingIdx].recurrence
+          };
+          newSchedules.push(this.schedules[existingIdx]);
+        } else {
+          const newSchedule = {
+            id: "sch_" + (baseTime + index) + "_" + Math.random().toString(36).substr(2, 6),
+            date: safeDate,
+            time: safeTime,
+            duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
+            title: safeTitle,
+            description: safeDescription,
+            category: item.category && typeof item.category === "string" ? item.category.trim() : item.kategori || "Fokus",
+            priority: ["low", "medium", "high"].includes(item.priority) ? item.priority : "medium",
+            deadline: item.deadline ? normalizeDateString(item.deadline) : null,
+            reminder: item.reminder !== false,
+            recurrence: ["none", "daily", "weekdays", "weekly", "monthly"].includes(item.recurrence) ? item.recurrence : "none",
+            completedDates: Array.isArray(item.completedDates) ? item.completedDates : [],
+            completed: !!item.completed,
+            createdAt: baseTime + index
+          };
+          this.schedules.push(newSchedule);
+          newSchedules.push(newSchedule);
+        }
       });
       if (newSchedules.length > 0) {
-        this.schedules.push(...newSchedules);
         this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
         const uniqueDates = [...new Set(newSchedules.map((s) => s.date))];
         uniqueDates.forEach((d) => this.syncDailyProductivity(d));
+        this.syncDailyProductivity();
         this.notify("schedules:batch-added", newSchedules);
       }
       return newSchedules;
@@ -634,9 +671,13 @@
         } else {
           compDates.push(dateToCheck);
         }
-        return this.updateSchedule(id, { completedDates: compDates });
+        const res = this.updateSchedule(id, { completedDates: compDates });
+        this.syncDailyProductivity(dateToCheck);
+        return res;
       } else {
-        return this.updateSchedule(id, { completed: !item.completed });
+        const res = this.updateSchedule(id, { completed: !item.completed });
+        if (targetDate) this.syncDailyProductivity(targetDate);
+        return res;
       }
     }
     deleteSchedule(id) {
@@ -645,6 +686,7 @@
       this.schedules = this.schedules.filter((s) => s.id !== id);
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
       if (itemDate) this.syncDailyProductivity(itemDate);
+      this.syncDailyProductivity();
       this.notify("schedule:deleted", id);
     }
     // --- Daily Productivity & Midnight Settlement ---
@@ -944,7 +986,10 @@
     repeat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>`,
     paperclip: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>`,
     file: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>`,
-    flame: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`
+    flame: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
+    cpu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>`,
+    zap: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+    "undo-2": `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>`
   };
   function getIcon(name, extraClass = "", size = 18) {
     const svg = icons[name] || icons.circle;
@@ -982,7 +1027,7 @@
       this._stateSubscribed = true;
       try {
         state.subscribe((event) => {
-          if (event === "schedule:added" || event === "schedule:updated" || event === "schedules:reset") {
+          if (event === "schedule:added" || event === "schedules:batch-added" || event === "schedule:updated" || event === "schedules:reset") {
             this._checkUpcomingSchedules();
           }
         });
@@ -1180,7 +1225,7 @@
           this.showToast("Izin notifikasi berhasil diaktifkan!", "success");
           this.playChime();
           this.sendSystemNotification("DayFlow \u2022 Notifikasi Aktif", {
-            body: "\u{1F514} Notifikasi pengingat agenda DayFlow siap muncul di layarmu.",
+            body: "Notifikasi pengingat agenda DayFlow siap muncul di layarmu.",
             tag: "dayflow_perm_granted"
           });
           state.notify("notifications:permission-changed", "granted");
@@ -1268,7 +1313,7 @@
         } catch (e) {
         }
       }
-      this.showToast(`\u{1F514} Uji Notifikasi: Bel ${toneName} berbunyi.`, "info", 4500);
+      this.showToast(`Uji Notifikasi: Bel ${toneName} berbunyi.`, "info", 4500);
       if (!("Notification" in window)) {
         this.showToast("Browser ini tidak mendukung Web Notifications di desktop/layar.", "warning");
         return false;
@@ -1282,7 +1327,7 @@
         return false;
       }
       const res = await this.sendSystemNotification("DayFlow \u2022 Notifikasi Berfungsi Normal!", {
-        body: `\u{1F514} Pengingat jadwal dan bunyi bel ${toneName} aktif. Siap mengingatkan agenda harianmu!`,
+        body: `Pengingat jadwal dan bunyi bel ${toneName} aktif. Siap mengingatkan agenda harianmu!`,
         tag: "dayflow_test_notification",
         renotify: true
       });
@@ -1841,8 +1886,11 @@ ${message}`));
     CENTRAL_API_KEY: "",
     // Default Gemini Intelligence Model (Token-efficient & broad answers)
     DEFAULT_MODEL: "gemini-2.5-flash",
+    // xAI Grok Fallback Configuration
+    GROK_API_URL: "https://api.x.ai/v1/chat/completions",
+    DEFAULT_GROK_MODEL: "grok-2-latest",
     // Version identifier
-    VERSION: "6.3.0"
+    VERSION: "6.4.0"
   };
   if (typeof window !== "undefined") {
     const localProxy = localStorage.getItem("dayflow_proxy_url");
@@ -1873,10 +1921,12 @@ Karakteristik & Aturan Wajib:
 6. Konteks waktu saat ini: {CURRENT_DATETIME}.
 7. Jadwal yang sudah ada hari ini:
 {TODAY_SCHEDULES}
-8. Tugas penting dengan tenggat/deadline mendatang:
+8. Jadwal aktif tersimpan di DayFlow:
+{SAVED_SCHEDULES}
+9. Tugas penting dengan tenggat/deadline mendatang:
 {DEADLINE_TASKS}
 Jika pengguna meminta bantuan mencicil tugas deadline (misalnya tugas deadline hari Minggu), berikan pemecahan sub-task taktis dan alokasi waktu yang realistis agar tidak menumpuk.
-9. AKSI PENJADWALAN CERDAS (ACTIONABLE SCHEDULE EXECUTION):
+10. AKSI PENJADWALAN CERDAS (ACTIONABLE SCHEDULE EXECUTION):
 Ketika pengguna meminta dibuatkan jadwal, menyebutkan rutinitas/rencana kegiatan (contoh: "jadwalkan besok jam 8 koding", "setiap hari jam 6 pagi lari santai", "ingatkan kumpul tugas hari senin jam 5 sore", atau informasi perkuliahan/kegiatan seperti "jadwal kuliah DDP jam 08.00 - selesai"):
 - Tuliskan jawaban percakapan yang ramah, ringkas, dan jelas dalam Bahasa Indonesia.
 - DI BAGIAN PALING AKHIR responmu, sertakan blok JSON kegiatan terstruktur di dalam tag khusus:
@@ -1903,7 +1953,7 @@ Aturan penting tag [DAYFLOW_SCHEDULES]:
 - Jika pengguna HANYA mengobrol santai, konsultasi, atau bertanya tips umum TANPA menyebut atau meminta jadwal kegiatan, JANGAN sertakan tag [DAYFLOW_SCHEDULES].
 - JANGAN PERNAH menambahkan kegiatan fiktif/pengisi (seperti istirahat/persiapan) yang tidak diminta!
 
-10. AKSI PEMBUATAN CATATAN OTOMATIS (ACTIONABLE NOTE EXECUTION):
+11. AKSI PEMBUATAN CATATAN OTOMATIS (ACTIONABLE NOTE EXECUTION):
 Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi/foto papan tulis/notula rapat yang cocok disimpan sebagai catatan:
 - Sertakan blok JSON catatan terstruktur di dalam tag:
 [DAYFLOW_NOTE]
@@ -1913,7 +1963,7 @@ Ketika pengguna meminta dibuatkan catatan/memo/rangkuman, atau memberikan materi
 }
 [/DAYFLOW_NOTE]
 
-11. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
+12. ANALISIS MULTIMODAL GAMBAR & DOKUMEN:
 Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akademik, silabus, foto papan tulis/catatan, poster event, atau screenshot kalender) atau berkas dokumen (PDF, TXT, CSV, ICS):
 - Teliti dan analisis seluruh teks dan informasi visual yang tertera di dalamnya secara cermat.
 - JIKA BERISI JADWAL/ACARA/DEADLINE:
@@ -1928,6 +1978,13 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
 - JIKA BERISI RINGKASAN MATERI/NOTULA/CATATAN TUGAS:
   * Berikan penjelasan penting.
   * WAJIB sertakan tag [DAYFLOW_NOTE] agar pengguna bisa langsung menyimpannya ke Catatan DayFlow dalam 1 klik.
+
+13. PENANGANAN REVISI / PERUBAHAN JADWAL TERDAHULU (UPDATE & RESCHEDULING):
+Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan kegiatan, atau pembatalan dari jadwal yang sebelumnya sudah diberikan atau jadwal yang tersimpan:
+- KONSISTENSI & ANTI-HALUSINASI: Pertahankan seluruh mata kuliah / kegiatan lain yang tidak diminta diubah secara utuh. Dilarang merombak, menghilangkan, atau menambah kegiatan lain tanpa instruksi eksplisit pengguna.
+- MODIFIKASI PRESISI: Hanya ubah parameter yang diminta pengguna (contoh: jika pengguna meminta "geser kuliah Kalkulus ke jam 13:00", maka ubah jam Kalkulus menjadi 13:00, sedangkan kegiatan hari lainnya tetap utuh).
+- KEMBALIKAN DAFTAR LENGKAP TERBARU: Di akhir jawaban, WAJIB sertakan blok [DAYFLOW_SCHEDULES] berisi SELURUH jadwal versi terbaru (kombinasi kegiatan yang tidak berubah + kegiatan yang sudah diperbaiki), agar antarmuka DayFlow langsung menyajikan jadwal teranyar secara komprehensif.
+- Jelaskan secara ringkas dan ramah perubahan apa saja yang berhasil disesuaikan.
 `;
   var GeminiService = class {
     static getApiKey() {
@@ -1938,11 +1995,17 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
     static getProxyUrl() {
       return (APP_CONFIG.AI_PROXY_URL || "").trim().replace(/\/+$/, "");
     }
+    static getGrokApiKey() {
+      return (state.getSettings().grokApiKey || "").trim();
+    }
+    static getGrokModel() {
+      return state.getSettings().grokModel || APP_CONFIG.DEFAULT_GROK_MODEL || "grok-2-latest";
+    }
     /**
-     * Returns true if AI is operational (either via secure proxy or API key)
+     * Returns true if AI is operational (either via secure proxy, Gemini key, or Grok key)
      */
     static isAiReady() {
-      return Boolean(this.getProxyUrl() || this.getApiKey());
+      return Boolean(this.getProxyUrl() || this.getApiKey() || this.getGrokApiKey());
     }
     static getModel() {
       return state.getSettings().geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.5-flash";
@@ -1950,6 +2013,7 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
     static buildSystemPrompt() {
       const todaySchedules = state.getTodaySchedules();
       const deadlineTasks = state.getDeadlineTasks();
+      const allSchedules = state.getSchedules();
       const now = /* @__PURE__ */ new Date();
       const timeStr = now.toLocaleDateString("id-ID", {
         weekday: "long",
@@ -1959,17 +2023,117 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
       }) + " " + now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       const scheduleListText = todaySchedules.length > 0 ? todaySchedules.map((s) => `- [${s.time} | ${s.duration}m | Prioritas: ${s.priority || "medium"}] ${s.title} (${s.completed ? "Selesai" : "Belum"})`).join("\n") : "(Belum ada jadwal hari ini)";
       const deadlineListText = deadlineTasks.length > 0 ? deadlineTasks.map((s) => `- Tugas: "${s.title}" (Tenggat: ${s.deadline}, Prioritas: ${s.priority || "medium"})`).join("\n") : "(Tidak ada tugas dengan tenggat khusus)";
-      return SYSTEM_INSTRUCTION_BASE.replace("{CURRENT_DATETIME}", timeStr).replace("{TODAY_SCHEDULES}", scheduleListText).replace("{DEADLINE_TASKS}", deadlineListText);
+      const activeListText = allSchedules.length > 0 ? allSchedules.slice(0, 30).map((s) => `- [${s.date} | ${s.time} | Durasi: ${s.duration}m | Perulangan: ${s.recurrence || "none"}] ${s.title}${s.description ? " (" + s.description + ")" : ""}`).join("\n") : "(Belum ada jadwal tersimpan di sistem)";
+      return SYSTEM_INSTRUCTION_BASE.replace("{CURRENT_DATETIME}", timeStr).replace("{TODAY_SCHEDULES}", scheduleListText).replace("{SAVED_SCHEDULES}", activeListText).replace("{DEADLINE_TASKS}", deadlineListText);
     }
     /**
-     * Resilient request sender routing through Serverless Proxy or direct Google Gemini with auto-failover
+     * Adapts Gemini payload format into OpenAI / xAI Grok compatible format
+     */
+    static convertGeminiPayloadToOpenAI(payload, model = null) {
+      const messages = [];
+      const systemParts = payload.systemInstruction?.parts || [];
+      const systemText = systemParts.map((p) => p.text).filter(Boolean).join("\n\n");
+      if (systemText) {
+        messages.push({ role: "system", content: systemText });
+      }
+      if (Array.isArray(payload.contents)) {
+        payload.contents.forEach((turn) => {
+          const role = turn.role === "model" || turn.role === "assistant" ? "assistant" : "user";
+          const parts = Array.isArray(turn.parts) ? turn.parts : [];
+          const hasImage = parts.some((p) => p.inlineData && p.inlineData.data);
+          if (hasImage) {
+            const contentList = [];
+            parts.forEach((p) => {
+              if (p.inlineData && p.inlineData.data) {
+                const mime = p.inlineData.mimeType || "image/jpeg";
+                contentList.push({
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mime};base64,${p.inlineData.data}`
+                  }
+                });
+              } else if (p.text) {
+                contentList.push({
+                  type: "text",
+                  text: p.text
+                });
+              }
+            });
+            messages.push({ role, content: contentList });
+          } else {
+            const combinedText = parts.map((p) => p.text).filter(Boolean).join("\n\n");
+            if (combinedText) {
+              messages.push({ role, content: combinedText });
+            }
+          }
+        });
+      }
+      const grokModel = model || this.getGrokModel();
+      return {
+        model: grokModel,
+        messages,
+        temperature: payload.generationConfig?.temperature ?? 0.4,
+        max_tokens: payload.generationConfig?.maxOutputTokens ?? 4096
+      };
+    }
+    /**
+     * Adapts OpenAI / xAI Grok response into Gemini response format
+     */
+    static convertOpenAIToGeminiResponse(grokData) {
+      const text = grokData?.choices?.[0]?.message?.content || "";
+      return {
+        candidates: [
+          {
+            content: {
+              parts: [{ text }],
+              role: "model"
+            },
+            finishReason: "STOP"
+          }
+        ],
+        provider: "grok",
+        model: grokData?.model || "grok-2-latest"
+      };
+    }
+    /**
+     * Direct request to xAI Grok API (Chat Completions)
+     */
+    static async requestGrokGenerateContent(payload, grokKey = null) {
+      const key = (grokKey || this.getGrokApiKey()).trim();
+      if (!key) {
+        throw new Error("xAI Grok API Key belum diatur.");
+      }
+      const apiUrl = APP_CONFIG.GROK_API_URL || "https://api.x.ai/v1/chat/completions";
+      const grokPayload = this.convertGeminiPayloadToOpenAI(payload);
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${key}`
+        },
+        body: JSON.stringify(grokPayload)
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData?.error?.message || `Grok HTTP ${response.status}`;
+        throw new Error(msg);
+      }
+      const data = await response.json();
+      return this.convertOpenAIToGeminiResponse(data);
+    }
+    /**
+     * Resilient request sender routing through Serverless Proxy or direct Google Gemini with auto-failover to Grok
      */
     static async requestGenerateContent(payload) {
       const apiKey = this.getApiKey();
       const proxyUrl = this.getProxyUrl();
       const userPersonalKey = (state.getSettings().apiKey || "").trim();
-      if (!apiKey && !proxyUrl) {
+      const grokKey = this.getGrokApiKey();
+      if (!apiKey && !proxyUrl && !grokKey) {
         throw new Error("Layanan AI belum siap. Konfigurasi AI Gateway atau masukkan API Key di Pengaturan.");
+      }
+      if (!apiKey && !proxyUrl && grokKey) {
+        return await this.requestGrokGenerateContent(payload, grokKey);
       }
       const primaryModel = this.getModel();
       const candidateModels = [primaryModel, "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-3.8-flash"].filter((v, i, a) => a.indexOf(v) === i);
@@ -1999,47 +2163,50 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
             const msg = errData?.error?.message || `Proxy HTTP ${status}`;
             lastError = new Error(msg);
             if (status === 400 || status === 403) {
-              throw lastError;
+              break;
             }
           } catch (err) {
-            if (err.message && (err.message.includes("API_KEY_INVALID") || err.message.includes("403"))) {
-              throw err;
-            }
             lastError = err;
           }
         }
-        throw lastError || new Error("Gagal menghubungi Serverless AI Proxy.");
-      }
-      for (const model of candidateModels) {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        try {
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": apiKey
-            },
-            body: JSON.stringify(payload)
-          });
-          if (response.ok) {
-            const data = await response.json();
-            if (model !== primaryModel) {
-              state.updateSettings({ geminiModel: model });
+      } else if (apiKey) {
+        for (const model of candidateModels) {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": apiKey
+              },
+              body: JSON.stringify(payload)
+            });
+            if (response.ok) {
+              const data = await response.json();
+              if (model !== primaryModel) {
+                state.updateSettings({ geminiModel: model });
+              }
+              return data;
             }
-            return data;
+            const errData = await response.json().catch(() => ({}));
+            const status = response.status;
+            const msg = errData?.error?.message || `HTTP ${status}`;
+            lastError = new Error(msg);
+            if (status === 400 || status === 403) {
+              break;
+            }
+          } catch (err) {
+            lastError = err;
           }
-          const errData = await response.json().catch(() => ({}));
-          const status = response.status;
-          const msg = errData?.error?.message || `HTTP ${status}`;
-          lastError = new Error(msg);
-          if (status === 400 || status === 403) {
-            throw lastError;
-          }
-        } catch (err) {
-          if (err.message && (err.message.includes("API_KEY_INVALID") || err.message.includes("403"))) {
-            throw err;
-          }
-          lastError = err;
+        }
+      }
+      if (grokKey) {
+        try {
+          console.info("DayFlow AI: Mengalihkan permintaan ke xAI Grok (fallback engine)...");
+          return await this.requestGrokGenerateContent(payload, grokKey);
+        } catch (grokErr) {
+          console.warn("DayFlow AI: Grok fallback juga gagal:", grokErr);
+          throw new Error(`Gemini & Grok gagal: ${lastError?.message || "Gemini kendala"} | ${grokErr.message}`);
         }
       }
       throw lastError || new Error("Gagal memproses permintaan AI.");
@@ -2352,6 +2519,92 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const err = await res.json().catch(() => ({}));
       throw new Error(err?.error?.message || `Serverless Proxy HTTP ${res.status}`);
     }
+    /**
+     * Health/Test Ping for xAI Grok Connection
+     */
+    static async testGrokConnection(customKey = null) {
+      const keyToTest = (customKey !== null ? customKey : this.getGrokApiKey()).trim();
+      if (!keyToTest) {
+        throw new Error("Belum ada Grok API Key yang dimasukkan.");
+      }
+      const testPayload = {
+        contents: [{ role: "user", parts: [{ text: "Halo, konfirmasi siap dalam 1 kata." }] }],
+        generationConfig: { maxOutputTokens: 20 }
+      };
+      const res = await this.requestGrokGenerateContent(testPayload, keyToTest);
+      return { success: true, mode: "grok", model: this.getGrokModel(), data: res };
+    }
+    /**
+     * AI Schedule Conflict Resolver
+     * Resolves schedule collisions by adjusting start times intelligently.
+     * Anti-Slop: Zero emojis, structured JSON response.
+     */
+    static async resolveScheduleConflicts(conflictsMap, daySchedules, targetDate) {
+      const conflictItems = [];
+      const fixedItems = [];
+      daySchedules.forEach((s) => {
+        if (conflictsMap.has(s.id)) {
+          const info = conflictsMap.get(s.id);
+          conflictItems.push({
+            id: s.id,
+            title: s.title,
+            time: s.time,
+            duration: s.duration || 30,
+            priority: s.priority || "medium",
+            category: s.category || "Fokus",
+            conflictWith: info.otherTitle,
+            overlapMinutes: info.overlapMinutes
+          });
+        } else {
+          fixedItems.push({
+            id: s.id,
+            title: s.title,
+            time: s.time,
+            duration: s.duration || 30
+          });
+        }
+      });
+      if (conflictItems.length === 0) return [];
+      const prompt = `
+Kamu adalah DayFlow AI Schedule Conflict Optimizer.
+Terdapat beberapa kegiatan yang saling bertabrakan (overlapping) pada tanggal ${targetDate}.
+
+Daftar Kegiatan yang Mengalami Bentrok:
+${JSON.stringify(conflictItems, null, 2)}
+
+Daftar Kegiatan Lain Hari Ini (Waktu Tetap / Jangan Ditabrak):
+${JSON.stringify(fixedItems, null, 2)}
+
+Instruksi Optimasi:
+1. Analisis prioritas kegiatan (high/tinggi lebih didahulukan daripada low/rendah) dan durasinya.
+2. Geser waktu mulai ("newTime") kegiatan yang bertabrakan ke slot waktu luang terdekat di hari yang sama agar tidak saling bertabrakan dan tidak menabrak jadwal tetap lainnya.
+3. Berikan jeda 5-10 menit antar kegiatan bila memungkinkan. Dilarang mengubah durasi kegiatan.
+4. JANGAN MENGGUNAKAN EMOJI DALAM BENTUK APAPUN.
+5. Format keluaran HANYA berupa JSON Array valid persis seperti format berikut tanpa teks atau markdown lain:
+[
+  {
+    "id": "ID_KEGIATAN",
+    "title": "Judul Kegiatan",
+    "oldTime": "HH:MM",
+    "newTime": "HH:MM",
+    "reason": "Alasan singkat penyesuaian waktu tanpa emoji (maksimal 1 kalimat)"
+  }
+]
+`;
+      const data = await this.requestGenerateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1024 }
+      });
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "[]";
+      const cleanJson = raw.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
+      try {
+        const solutions = JSON.parse(cleanJson);
+        return Array.isArray(solutions) ? solutions : [];
+      } catch (e) {
+        console.error("Failed to parse AI conflict solutions:", raw, e);
+        throw new Error("AI gagal menghasilkan format solusi resolusi bentrok.");
+      }
+    }
   };
 
   // js/components/modal-templates.js
@@ -2413,7 +2666,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
             <summary class="advanced-options-summary">
               <span style="display:inline-flex; align-items:center; gap:8px;">
                 <span data-icon="sliders" data-icon-size="14"></span>
-                <span>Pengaturan Tambahan (Kategori, Pengulangan, Prioritas)</span>
+                <span>Opsi Tambahan (Kategori, Prioritas & Pengingat)</span>
               </span>
               <span class="advanced-summary-chevron" data-icon="chevron-down" data-icon-size="14"></span>
             </summary>
@@ -2779,10 +3032,41 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           </div>
         </div>
       </div>
+    <!-- Modal: AI Schedule Conflict Resolver (Bottom-sheet) -->
+    <div id="modal-conflict-resolver" class="modal-overlay" role="dialog" aria-modal="true">
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="text-orange" data-icon="sliders" data-icon-size="18"></span>
+            <h3 class="sheet-title">Rekomendasi Penataan Jadwal</h3>
+          </div>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup">
+            <span data-icon="x" data-icon-size="18"></span>
+          </button>
+        </div>
+
+        <div class="modal-form-clean" style="gap:14px;">
+          <p class="text-xs text-secondary" style="margin:0; line-height:1.5;">
+            AI telah menganalisis prioritas dan slot waktu luang tanpa menabrak agenda lain. Tinjau penyesuaian waktu berikut:
+          </p>
+
+          <div id="conflict-solutions-list" class="conflict-solutions-list">
+            <!-- Injected via schedule-view.js -->
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.dayflowApp.closeAllModals()">
+              Batal
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-apply-conflict-solutions">
+              <span data-icon="check" data-icon-size="14"></span>
+              Terapkan Jadwal Baru
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
-
-
-
 `;
   function mountModals() {
     let root = document.getElementById("modals-root");
@@ -3777,19 +4061,19 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       }
       if (statusText) {
         if (prod.totalScheduled === 0) {
-          statusText.textContent = "Tambahkan jadwal kegiatan untuk mengaktifkan target hari ini.";
+          statusText.textContent = "Belum ada agenda hari ini.";
         } else if (prod.isComplete) {
-          statusText.textContent = "Luar biasa! Seluruh agenda hari ini berhasil dituntaskan.";
+          statusText.textContent = "Semua agenda hari ini telah tuntas!";
         } else {
           const remaining = prod.totalScheduled - prod.completedCount;
-          statusText.textContent = `${remaining} kegiatan lagi untuk mencapai 100% tuntas sebelum pukul 24:00.`;
+          statusText.textContent = `${remaining} kegiatan lagi hari ini.`;
         }
       }
       if (streakText) {
         if (stats.perfectDays > 0) {
-          streakText.textContent = `${stats.perfectDays} Hari Tuntas`;
+          streakText.textContent = `${stats.perfectDays} Hari Konsisten`;
         } else {
-          streakText.textContent = "Target Hari Ini";
+          streakText.textContent = "Mulai Konsistensi Hari Ini";
         }
       }
       if (prod.isComplete && !this._lastCelebratedComplete) {
@@ -3803,28 +4087,27 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       } else if (!prod.isComplete) {
         this._lastCelebratedComplete = false;
       }
+      this.initRealtimeClock();
     },
     initRealtimeClock() {
       const updateClock = () => {
+        const now = /* @__PURE__ */ new Date();
         const clockEl = document.getElementById("banner-live-clock");
         if (clockEl) {
-          const now = /* @__PURE__ */ new Date();
           const h = String(now.getHours()).padStart(2, "0");
           const m = String(now.getMinutes()).padStart(2, "0");
           const s = String(now.getSeconds()).padStart(2, "0");
           clockEl.textContent = `${h}:${m}:${s}`;
         }
+        const countdownText = document.getElementById("today-countdown-text");
+        if (countdownText && !countdownText.textContent.includes("Tuntas 100%")) {
+          const prod = state.getTodayProductivity();
+          countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
+        }
       };
       updateClock();
       if (!this._realtimeClockInterval) {
-        this._realtimeClockInterval = setInterval(() => {
-          updateClock();
-          const countdownText = document.getElementById("today-countdown-text");
-          if (countdownText && !countdownText.textContent.includes("Tuntas 100%")) {
-            const prod = state.getTodayProductivity();
-            countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
-          }
-        }, 1e3);
+        this._realtimeClockInterval = setInterval(updateClock, 1e3);
       }
     }
   };
@@ -3840,7 +4123,9 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         schedules = schedules.filter((s) => s.category && s.category.toLowerCase() === this.selectedCategory.toLowerCase());
       }
       const listEl = document.getElementById("full-schedule-list");
-      this.renderTimelineGrid(schedules, listEl, false);
+      const isToday = !this.selectedScheduleDate || this.selectedScheduleDate === getLocalDateString();
+      this.renderTimelineGrid(schedules, listEl, isToday);
+      this.setupSwipeNavigation(listEl);
       const dateInput = document.getElementById("schedule-date-filter");
       if (dateInput) {
         dateInput.onchange = () => {
@@ -3955,11 +4240,25 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           const id = toggleBtn.getAttribute("data-id");
           const targetDate = toggleBtn.getAttribute("data-date");
           const sch = state.getSchedules(targetDate).find((s) => s.id === id);
-          if (!sch?.completed) {
+          const willComplete = !sch?.completed;
+          if (willComplete) {
             particleBurst(toggleBtn, "var(--status-success)");
+            if (navigator.vibrate) {
+              try {
+                navigator.vibrate([15, 30, 20]);
+              } catch (e2) {
+              }
+            }
+            notifications.playChime("crystal");
           }
           springBounce(toggleBtn);
           state.toggleScheduleComplete(id, targetDate);
+          if (willComplete && sch) {
+            this.showUndoCompletionToast(id, targetDate, sch.title);
+          }
+          return;
+        }
+        if (target.closest('[data-action="gcal"]')) {
           return;
         }
         const editBtn = target.closest('[data-action="edit-schedule"]');
@@ -3983,6 +4282,23 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
             notifications.showToast("Jadwal berhasil dihapus.", "info");
           }
           return;
+        }
+        const card = target.closest(".timeline-card");
+        if (card && !target.closest("button") && !target.closest("a")) {
+          const id = card.getAttribute("data-id");
+          if (id) {
+            this.openScheduleModal(id);
+          }
+        }
+      });
+      containerEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          const card = e.target.closest(".timeline-card");
+          if (card && e.target === card) {
+            e.preventDefault();
+            const id = card.getAttribute("data-id");
+            if (id) this.openScheduleModal(id);
+          }
         }
       });
     },
@@ -4010,11 +4326,33 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         <div class="empty-state">
           <div class="empty-state-icon">${getIcon("calendar", "", 20)}</div>
           <p class="empty-state-title">Tidak ada agenda ${isToday ? "hari ini" : "pada tanggal ini"}</p>
-          <p class="empty-state-desc">Gunakan tombol tambah di atas atau gunakan Rencana AI untuk merapikan kegiatanmu.</p>
+          <p class="empty-state-desc">Mulai hari dengan mencatat kegiatan atau susun jadwal otomatis bersama AI.</p>
+          <div class="empty-state-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-empty-add-schedule">
+              ${getIcon("plus", "", 14)} Tambah Jadwal
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-empty-ai-plan">
+              ${getIcon("bot", "", 14)} Rencana AI
+            </button>
+          </div>
           ${carryOverBtnHtml}
         </div>
       `;
         renderIcons(containerEl);
+        const addBtn = containerEl.querySelector("#btn-empty-add-schedule");
+        if (addBtn) {
+          addBtn.addEventListener("click", () => {
+            springBounce(addBtn);
+            this.openScheduleModal(null, isToday ? getLocalDateString() : this.selectedScheduleDate);
+          });
+        }
+        const aiPlanBtn = containerEl.querySelector("#btn-empty-ai-plan");
+        if (aiPlanBtn) {
+          aiPlanBtn.addEventListener("click", () => {
+            springBounce(aiPlanBtn);
+            this.switchTab("ai-plan");
+          });
+        }
         const carryBtn = containerEl.querySelector("#btn-carry-over-action");
         if (carryBtn) {
           carryBtn.addEventListener("click", () => {
@@ -4031,7 +4369,46 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
       const todayStr = getLocalDateString(now);
       const conflicts = detectScheduleConflicts(schedules);
-      containerEl.innerHTML = schedules.map((s) => {
+      const targetDate = schedules[0]?.date || this.selectedScheduleDate || getLocalDateString();
+      let conflictBannerHtml = "";
+      if (conflicts.size > 0) {
+        conflictBannerHtml = `
+        <div class="conflict-resolver-banner" id="conflict-resolver-banner">
+          <div class="conflict-resolver-info">
+            <span class="conflict-resolver-icon">${getIcon("alert-triangle", "", 18)}</span>
+            <div class="conflict-resolver-text">
+              <span class="conflict-resolver-title">Ada ${conflicts.size} Jadwal Bertabrakan</span>
+              <span class="conflict-resolver-desc">Jadwal pada jam yang sama dapat membuyarkan fokus. AI dapat menata ulang jam luang secara otomatis.</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm conflict-resolver-btn" id="btn-resolve-conflicts">
+            ${getIcon("cpu", "", 14)} Selesaikan Bentrok
+          </button>
+        </div>
+      `;
+      }
+      const sortedSchedules = [...schedules].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      const nowH = String(now.getHours()).padStart(2, "0");
+      const nowM = String(now.getMinutes()).padStart(2, "0");
+      const nowIndicatorHtml = `
+      <div class="timeline-row timeline-now-row">
+        <div class="timeline-time-col">
+          <span class="timeline-now-badge tabular-nums font-mono">${nowH}:${nowM}</span>
+        </div>
+        <div class="timeline-rail-col">
+          <div class="timeline-now-pulse-dot"></div>
+        </div>
+        <div class="timeline-card-col">
+          <div class="timeline-now-line-wrap">
+            <div class="timeline-now-line"></div>
+            <span class="timeline-now-label">Sekarang</span>
+          </div>
+        </div>
+      </div>
+    `;
+      let nowInserted = false;
+      let itemsHtml = "";
+      sortedSchedules.forEach((s) => {
         const timeVal = s.time || "00:00";
         const parts = timeVal.split(":").map(Number);
         const h = isNaN(parts[0]) ? 0 : parts[0];
@@ -4042,6 +4419,10 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         const endM = String(endMinutes % 60).padStart(2, "0");
         const timeSpanText = `${timeVal} \u2014 ${endH}:${endM}`;
         const isActive = isToday && !s.completed && s.date === todayStr && currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+        if (isToday && !nowInserted && currentMinutes < startMinutes) {
+          itemsHtml += nowIndicatorHtml;
+          nowInserted = true;
+        }
         let priorityBadgeHtml = "";
         if (s.priority === "high") {
           priorityBadgeHtml = '<span class="priority-badge priority-high">P1 \u2022 Tinggi</span>';
@@ -4091,7 +4472,7 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
         <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background-color:${catColor}; margin-right:4px; vertical-align:middle;"></span>${escapeHtml(s.category || "Kerja")}
       </span>`;
         const gcalUrl = generateGoogleCalendarUrl(s);
-        return `
+        itemsHtml += `
         <div class="timeline-row ${s.completed ? "completed" : ""} ${isActive ? "is-active" : ""} ${s.priority === "high" ? "priority-high-row" : ""} ${conflicts.has(s.id) ? "timeline-row-conflict" : ""}">
           <!-- Column 1: Time -->
           <div class="timeline-time-col">
@@ -4104,21 +4485,51 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
             <div class="timeline-line"></div>
           </div>
 
-          <!-- Column 3: Card Content -->
+          <!-- Column 3: Card Content (Click to edit) -->
           <div class="timeline-card-col">
-            <div class="timeline-card">
+            <div class="timeline-card" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(s.title)}, ${s.completed ? "selesai" : "belum selesai"}. Klik untuk mengubah">
               <div class="timeline-card-header">
-                <div style="display:flex; flex-direction:column; gap:4px; min-width:0; flex:1;">
+                <button type="button" 
+                        class="schedule-check-circle ${s.completed ? "is-checked" : ""}" 
+                        data-action="toggle-complete" 
+                        data-id="${s.id}" 
+                        data-date="${s.date}"
+                        title="${s.completed ? "Tandai belum selesai" : "Tandai selesai"}"
+                        aria-label="${s.completed ? "Tandai belum selesai" : "Tandai selesai"}">
+                  ${s.completed ? getIcon("check", "", 12) : ""}
+                </button>
+
+                <div class="timeline-card-main-info">
                   <div class="timeline-card-title">${escapeHtml(s.title)}</div>
                   ${s.description ? `<div class="timeline-card-desc" style="font-size:12px; color:var(--text-secondary); line-height:1.4;">${escapeHtml(s.description)}</div>` : ""}
-                  <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <div class="timeline-badges-row">
+                    ${catBadgeHtml}
                     ${priorityBadgeHtml}
                     ${recurrenceBadgeHtml}
                     ${deadlineBadgeHtml}
                     ${conflictBadgeHtml}
                   </div>
                 </div>
-                ${catBadgeHtml}
+
+                <div class="timeline-card-quick-actions">
+                  <a href="${gcalUrl}" 
+                     target="_blank" 
+                     rel="noopener noreferrer" 
+                     class="card-icon-action" 
+                     title="Ekspor ke Google Calendar" 
+                     aria-label="Ekspor ke Google Calendar"
+                     data-action="gcal">
+                    ${getIcon("calendar", "", 13)}
+                  </a>
+                  <button type="button" 
+                          class="card-icon-action text-danger" 
+                          data-action="delete-schedule" 
+                          data-id="${s.id}" 
+                          title="Hapus Agenda" 
+                          aria-label="Hapus Agenda">
+                    ${getIcon("trash", "", 13)}
+                  </button>
+                </div>
               </div>
 
               <div class="timeline-card-footer">
@@ -4127,39 +4538,173 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
                   <span class="tabular-nums">${timeSpanText} (${s.duration} min)</span>
                   ${isActive ? '<span class="status-live-tag">Aktif</span>' : ""}
                 </div>
-
-                <div class="timeline-card-actions">
-                  <a href="${gcalUrl}" 
-                     target="_blank" 
-                     rel="noopener noreferrer" 
-                     class="btn btn-ghost btn-xs" 
-                     title="Buka di Google Calendar" 
-                     aria-label="Buka di Google Calendar"
-                     style="display:inline-flex; align-items:center; color:var(--text-secondary);">
-                    ${getIcon("calendar", "", 13)}
-                  </a>
-                  <button class="btn btn-ghost btn-xs btn-check ${s.completed ? "is-done" : ""}" 
-                          data-action="toggle-complete" 
-                          data-id="${s.id}" 
-                          data-date="${s.date}"
-                          title="${s.completed ? "Tandai belum selesai" : "Tandai selesai"}">
-                    ${getIcon(s.completed ? "check-circle" : "circle", "", 14)}
-                    <span>${s.completed ? "Selesai" : "Check"}</span>
-                  </button>
-                  <button class="btn btn-ghost btn-xs" data-action="edit-schedule" data-id="${s.id}" title="Ubah">
-                    ${getIcon("edit", "", 13)}
-                  </button>
-                  <button class="btn btn-ghost btn-xs text-muted" data-action="delete-schedule" data-id="${s.id}" title="Hapus">
-                    ${getIcon("trash", "", 13)}
-                  </button>
-                </div>
+                <span class="card-edit-hint">Ketuk untuk edit</span>
               </div>
             </div>
           </div>
         </div>
       `;
-      }).join("");
+      });
+      if (isToday && !nowInserted) {
+        itemsHtml += nowIndicatorHtml;
+        nowInserted = true;
+      }
+      containerEl.innerHTML = conflictBannerHtml + itemsHtml;
       renderIcons(containerEl);
+      const resolveBtn = containerEl.querySelector("#btn-resolve-conflicts");
+      if (resolveBtn) {
+        resolveBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          springBounce(resolveBtn);
+          this.handleResolveConflicts(conflicts, schedules, targetDate);
+        });
+      }
+    },
+    async handleResolveConflicts(conflicts, schedules, targetDate) {
+      if (!GeminiService.isAiReady()) {
+        notifications.showToast("Layanan AI belum siap. Hubungkan AI Gateway atau masukkan API Key di Pengaturan.", "warning", 5e3);
+        return;
+      }
+      const btn = document.getElementById("btn-resolve-conflicts");
+      const origHtml = btn ? btn.innerHTML : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span class="spinner"></span> Menata ulang...`;
+      }
+      try {
+        const solutions = await GeminiService.resolveScheduleConflicts(conflicts, schedules, targetDate);
+        if (!solutions || solutions.length === 0) {
+          notifications.showToast("Tidak ada rekomendasi pergeseran jadwal yang diperlukan.", "info", 4e3);
+          return;
+        }
+        this.openConflictResolverModal(solutions);
+      } catch (err) {
+        notifications.showToast(`Gagal merapikan bentrok: ${err.message}`, "error", 6e3);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+          renderIcons(btn);
+        }
+      }
+    },
+    openConflictResolverModal(solutions) {
+      const modal = document.getElementById("modal-conflict-resolver");
+      const listEl = document.getElementById("conflict-solutions-list");
+      if (!modal || !listEl) return;
+      let html = "";
+      solutions.forEach((sol) => {
+        html += `
+        <div class="conflict-solution-card">
+          <div class="conflict-solution-header">
+            <span class="conflict-solution-title">${escapeHtml(sol.title || "Kegiatan")}</span>
+            <div class="conflict-solution-times">
+              <span class="conflict-old-time tabular-nums">${escapeHtml(sol.oldTime || "--:--")}</span>
+              <span class="conflict-arrow-icon">${getIcon("chevron-right", "", 12)}</span>
+              <span class="conflict-new-time tabular-nums font-mono font-bold">${escapeHtml(sol.newTime || "--:--")}</span>
+            </div>
+          </div>
+          ${sol.reason ? `<div class="conflict-solution-reason">${escapeHtml(sol.reason)}</div>` : ""}
+        </div>
+      `;
+      });
+      listEl.innerHTML = html;
+      renderIcons(modal);
+      const applyBtn = document.getElementById("btn-apply-conflict-solutions");
+      if (applyBtn) {
+        applyBtn.onclick = () => {
+          let appliedCount = 0;
+          solutions.forEach((sol) => {
+            if (sol.id && sol.newTime) {
+              state.updateSchedule(sol.id, { time: sol.newTime });
+              appliedCount++;
+            }
+          });
+          window.dayflowApp.closeAllModals();
+          notifications.playChime("crystal");
+          notifications.showToast(`${appliedCount} jadwal berhasil disesuaikan tanpa tabrakan.`, "success", 5e3);
+        };
+      }
+      modal.classList.add("open");
+    },
+    showUndoCompletionToast(scheduleId, targetDate, title) {
+      const existing = document.getElementById("df-undo-toast");
+      if (existing) existing.remove();
+      const toast = document.createElement("div");
+      toast.id = "df-undo-toast";
+      toast.className = "undo-toast";
+      toast.innerHTML = `
+      <div class="undo-toast-content">
+        <span class="undo-toast-icon">${getIcon("check", "", 14)}</span>
+        <span class="undo-toast-text">Selesai: <strong>${escapeHtml(title || "Kegiatan")}</strong></span>
+      </div>
+      <button type="button" class="btn btn-ghost btn-xs undo-toast-btn" id="btn-undo-schedule-complete">
+        ${getIcon("undo-2", "", 13)}
+        Urungkan
+      </button>
+    `;
+      document.body.appendChild(toast);
+      renderIcons(toast);
+      requestAnimationFrame(() => {
+        toast.classList.add("is-visible");
+      });
+      let cleared = false;
+      const dismissTimer = setTimeout(() => {
+        if (!cleared) {
+          cleared = true;
+          toast.classList.remove("is-visible");
+          setTimeout(() => toast.remove(), 250);
+        }
+      }, 5e3);
+      const undoBtn = toast.querySelector("#btn-undo-schedule-complete");
+      if (undoBtn) {
+        undoBtn.addEventListener("click", () => {
+          if (!cleared) {
+            cleared = true;
+            clearTimeout(dismissTimer);
+            toast.classList.remove("is-visible");
+            setTimeout(() => toast.remove(), 250);
+            state.toggleScheduleComplete(scheduleId, targetDate);
+            notifications.showToast("Penyelesaian agenda berhasil diurungkan.", "info", 3e3);
+          }
+        });
+      }
+    },
+    setupSwipeNavigation(element) {
+      if (!element || element._hasSwipe) return;
+      element._hasSwipe = true;
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+      element.addEventListener("touchstart", (e) => {
+        if (e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        startTime = Date.now();
+      }, { passive: true });
+      element.addEventListener("touchend", (e) => {
+        if (e.changedTouches.length !== 1) return;
+        const endX = e.changedTouches[0].clientX;
+        const endY = e.changedTouches[0].clientY;
+        const deltaX = endX - startX;
+        const deltaY = endY - startY;
+        const elapsed = Date.now() - startTime;
+        if (elapsed < 500 && Math.abs(deltaX) > 60 && Math.abs(deltaY) < 50) {
+          if (deltaX < 0) {
+            this.advanceScheduleDate(1);
+          } else {
+            this.advanceScheduleDate(-1);
+          }
+        }
+      }, { passive: true });
+    },
+    advanceScheduleDate(delta) {
+      const cur = /* @__PURE__ */ new Date((this.selectedScheduleDate || getLocalDateString()) + "T00:00:00");
+      cur.setDate(cur.getDate() + delta);
+      this.selectedScheduleDate = getLocalDateString(cur);
+      const dateInput = document.getElementById("schedule-date-filter");
+      if (dateInput) dateInput.value = this.selectedScheduleDate;
+      this.renderScheduleView();
     }
   };
 
@@ -4189,7 +4734,9 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           if (dayIdx !== void 0) {
             const nowObj = /* @__PURE__ */ new Date();
             let diff = dayIdx - nowObj.getDay();
-            if (diff <= 0) diff += 7;
+            const isNextWeek = /\b(?:minggu\s+depan|depan)\b/i.test(chunk);
+            if (diff < 0) diff += 7;
+            if (isNextWeek && diff === 0) diff += 7;
             const targetDay = new Date(nowObj);
             targetDay.setDate(targetDay.getDate() + diff);
             currentContextDate = getLocalDateString(targetDay);
@@ -4243,7 +4790,9 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
               if (new RegExp(`\\b(?:hari\\s+)?${dayName}\\b`, "i").test(lower)) {
                 const nowObj = /* @__PURE__ */ new Date();
                 let diff = dayIdx - nowObj.getDay();
-                if (diff <= 0) diff += 7;
+                const isNextWeek = /\b(?:minggu\s+depan|depan)\b/i.test(lower);
+                if (diff < 0) diff += 7;
+                if (isNextWeek && diff === 0) diff += 7;
                 const targetDay = new Date(nowObj);
                 targetDay.setDate(targetDay.getDate() + diff);
                 itemDate = getLocalDateString(targetDay);
@@ -4786,6 +5335,24 @@ Jawab atau temukan informasi yang dicari pengguna berdasarkan daftar catatan di 
           });
         }
       });
+      if (chatInput && !chatInput._hasFocusScrollHandler) {
+        chatInput._hasFocusScrollHandler = true;
+        chatInput.addEventListener("focus", () => {
+          setTimeout(() => {
+            const ch = document.getElementById("chat-history");
+            if (ch) ch.scrollTop = ch.scrollHeight;
+          }, 150);
+        });
+      }
+      if (window.visualViewport && !window._hasVisualViewportChatHandler) {
+        window._hasVisualViewportChatHandler = true;
+        window.visualViewport.addEventListener("resize", () => {
+          if (document.body.classList.contains("tab-ai-plan")) {
+            const ch = document.getElementById("chat-history");
+            if (ch) ch.scrollTop = ch.scrollHeight;
+          }
+        });
+      }
     },
     setupChatDelegation(containerEl) {
       if (!containerEl || containerEl._hasChatDelegation) return;
@@ -5169,33 +5736,44 @@ ${JSON.stringify(fallbackItems)}
         );
       }
       if (filtered.length === 0) {
+        const isSearching = Boolean(filterQuery);
         listEl.innerHTML = `
         <div class="empty-state">
-          <div class="empty-state-icon">${getIcon("file-text", "", 20)}</div>
-          <p class="empty-state-title">Belum ada catatan</p>
-          <p class="empty-state-desc">Catat ide cepat, ringkasan rapat, atau memo harian di sini.</p>
+          <div class="empty-state-icon">${getIcon(isSearching ? "search" : "file-text", "", 20)}</div>
+          <p class="empty-state-title">${isSearching ? "Catatan tidak ditemukan" : "Belum ada catatan"}</p>
+          <p class="empty-state-desc">${isSearching ? "Coba gunakan kata kunci lain untuk mencari ide atau memo." : "Catat ide cepat, ringkasan rapat, atau memo harian di sini."}</p>
+          ${!isSearching ? `
+            <div class="empty-state-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="btn-empty-add-note">
+                ${getIcon("plus", "", 14)} Buat Catatan Baru
+              </button>
+            </div>
+          ` : ""}
         </div>
       `;
         renderIcons(listEl);
+        const addNoteBtn = listEl.querySelector("#btn-empty-add-note");
+        if (addNoteBtn) {
+          addNoteBtn.addEventListener("click", () => {
+            springBounce(addNoteBtn);
+            this.openNoteModal();
+          });
+        }
         return;
       }
       listEl.innerHTML = filtered.map((note) => {
         const dateObj = note.updatedAt && !isNaN(new Date(note.updatedAt).getTime()) ? new Date(note.updatedAt) : /* @__PURE__ */ new Date();
-        const dateStr = dateObj.toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+        const dateStr = dateObj.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
         return `
-      <div class="note-card" data-note-id="${note.id}">
+      <div class="note-card" data-note-id="${note.id}" role="button" tabindex="0" title="Klik untuk membuka catatan">
         <div class="note-card-title">${escapeHtml(note.title || "Catatan Tanpa Judul")}</div>
         <div class="note-card-preview">${escapeHtml(note.content || "")}</div>
         <div class="note-card-footer">
-          <span>${dateStr}</span>
-          <div style="display:flex; gap:6px;">
-            <button class="btn btn-ghost btn-sm" data-action="edit-note" data-id="${note.id}" aria-label="Ubah catatan">
-              ${getIcon("edit", "", 14)}
-            </button>
-            <button class="btn btn-ghost btn-sm text-muted" data-action="delete-note" data-id="${note.id}" aria-label="Hapus catatan">
-              ${getIcon("trash", "", 14)}
-            </button>
-          </div>
+          <span class="text-xs text-muted">${dateStr}</span>
+          <button class="btn btn-ghost btn-xs text-muted" data-action="delete-note" data-id="${note.id}" aria-label="Hapus catatan" title="Hapus catatan">
+            ${getIcon("trash", "", 13)}
+          </button>
+        </div>
       </div>
       `;
       }).join("");
@@ -5215,19 +5793,19 @@ ${JSON.stringify(fallbackItems)}
         btnAiSearch.onclick = async () => {
           const query = searchInput ? searchInput.value.trim() : "";
           if (!query) {
-            notifications.showToast("Masukkan kata kunci pencarian terlebih dahulu.", "warning");
+            notifications.showToast("Ketik topik atau kata kunci terlebih dahulu.", "warning");
             return;
           }
           btnAiSearch.disabled = true;
-          btnAiSearch.innerHTML = `<span class="spinner"></span> Mencari...`;
+          btnAiSearch.innerHTML = `<span class="spinner"></span> Merangkum...`;
           try {
             const result = await GeminiService.searchNotesWithAI(query, state.getNotes());
-            notifications.showToast(`Temuan AI: ${result}`, "info", 6e3);
+            notifications.showToast(`Rangkuman AI: ${result}`, "info", 6e3);
           } catch (err) {
             notifications.showToast(err.message, "error");
           } finally {
             btnAiSearch.disabled = false;
-            btnAiSearch.innerHTML = `${getIcon("search", "", 14)} Cari`;
+            btnAiSearch.innerHTML = `${getIcon("bot", "", 14)} Rangkum AI`;
             renderIcons();
           }
         };
@@ -5246,7 +5824,9 @@ ${JSON.stringify(fallbackItems)}
       const soundToggle = document.getElementById("setting-sound");
       const toneSelect = document.getElementById("setting-sound-tone");
       const proactiveToggle = document.getElementById("setting-proactive");
+      const grokInput = document.getElementById("setting-grok-api-key");
       if (apiInput) apiInput.value = settings.apiKey || "";
+      if (grokInput) grokInput.value = settings.grokApiKey || "";
       if (modelSelect) modelSelect.value = settings.geminiModel || APP_CONFIG.DEFAULT_MODEL || "gemini-2.5-flash";
       if (advanceInput) advanceInput.value = settings.notifyAdvanceMinutes || 15;
       const badgeEl = document.getElementById("central-ai-status-badge");
@@ -5256,6 +5836,11 @@ ${JSON.stringify(fallbackItems)}
           badgeEl.style.color = "#ea580c";
           badgeEl.style.borderColor = "rgba(234, 88, 12, 0.25)";
           badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#ea580c; display:inline-block;"></span> Key Pribadi Aktif`;
+        } else if (settings.grokApiKey) {
+          badgeEl.style.background = "rgba(14, 165, 233, 0.12)";
+          badgeEl.style.color = "#0ea5e9";
+          badgeEl.style.borderColor = "rgba(14, 165, 233, 0.25)";
+          badgeEl.innerHTML = `<span style="width:6px; height:6px; border-radius:50%; background:#0ea5e9; display:inline-block;"></span> AI + Grok Siap`;
         } else if (GeminiService.isAiReady()) {
           badgeEl.style.background = "rgba(34, 197, 94, 0.12)";
           badgeEl.style.color = "#22c55e";
@@ -5334,6 +5919,7 @@ ${JSON.stringify(fallbackItems)}
       const bannerUrlInput = document.getElementById("setting-banner-url");
       const bannerEnabledToggle = document.getElementById("setting-banner-enabled");
       const systemNotifToggle = document.getElementById("setting-system-notif");
+      const grokInput = document.getElementById("setting-grok-api-key");
       state.updateSettings({
         userName: userNameInput ? userNameInput.value.trim() : "",
         heroBannerEnabled: bannerEnabledToggle ? bannerEnabledToggle.checked : false,
@@ -5341,6 +5927,7 @@ ${JSON.stringify(fallbackItems)}
         heroBannerQuote: bannerQuoteInput ? bannerQuoteInput.value.trim() : "Fokus pada hal penting hari ini.",
         heroBannerUrl: bannerUrlInput ? bannerUrlInput.value.trim() : "",
         apiKey: apiInput ? apiInput.value.trim() : "",
+        grokApiKey: grokInput ? grokInput.value.trim() : "",
         geminiModel: modelSelect ? modelSelect.value : "gemini-2.5-flash",
         notifyAdvanceMinutes: parseInt(advanceInput ? advanceInput.value : "15", 10) || 15,
         soundEnabled: soundToggle ? soundToggle.checked : true,
@@ -5405,6 +5992,40 @@ ${JSON.stringify(fallbackItems)}
       if (apiInput) apiInput.value = "";
       this.renderSettingsView();
       notifications.showToast("API Key pribadi telah dihapus dari peramban ini. DayFlow kini aktif menggunakan AI Terpusat.", "success", 5e3);
+    },
+    async handleTestGrokApiKey() {
+      const grokKey = document.getElementById("setting-grok-api-key")?.value.trim();
+      const testBtn = document.getElementById("btn-test-grok-api");
+      if (!grokKey) {
+        notifications.showToast("Masukkan xAI Grok API Key terlebih dahulu untuk menguji.", "warning", 4e3);
+        return;
+      }
+      const orig = testBtn ? testBtn.innerHTML : "";
+      if (testBtn) {
+        testBtn.disabled = true;
+        testBtn.innerHTML = `<span class="spinner"></span> Menguji...`;
+      }
+      try {
+        const res = await GeminiService.testGrokConnection(grokKey);
+        state.updateSettings({ grokApiKey: grokKey });
+        this.renderSettingsView();
+        notifications.showToast(`Koneksi xAI Grok valid dan siap sebagai fallback cadangan! (${res.model})`, "success", 5e3);
+      } catch (err) {
+        notifications.showToast(`Uji Grok gagal: ${err.message}`, "error", 6e3);
+      } finally {
+        if (testBtn) {
+          testBtn.disabled = false;
+          testBtn.innerHTML = orig;
+          renderIcons(testBtn);
+        }
+      }
+    },
+    handleClearGrokApiKey() {
+      state.updateSettings({ grokApiKey: "" });
+      const grokInput = document.getElementById("setting-grok-api-key");
+      if (grokInput) grokInput.value = "";
+      this.renderSettingsView();
+      notifications.showToast("Grok API Key cadangan telah dihapus dari peramban ini.", "success", 5e3);
     },
     handleExportData() {
       const backup = {
@@ -5878,6 +6499,23 @@ ${JSON.stringify(fallbackItems)}
           toggleKeyBtn.innerHTML = getIcon(isPassword ? "eye-off" : "eye", "", 16);
         });
       }
+      const testGrokBtn = document.getElementById("btn-test-grok-api");
+      if (testGrokBtn) {
+        testGrokBtn.addEventListener("click", () => this.handleTestGrokApiKey());
+      }
+      const clearGrokBtn = document.getElementById("btn-clear-grok-api-key");
+      if (clearGrokBtn) {
+        clearGrokBtn.addEventListener("click", () => this.handleClearGrokApiKey());
+      }
+      const toggleGrokBtn = document.getElementById("btn-toggle-grok-key-visibility");
+      const grokKeyInput = document.getElementById("setting-grok-api-key");
+      if (toggleGrokBtn && grokKeyInput) {
+        toggleGrokBtn.addEventListener("click", () => {
+          const isPassword = grokKeyInput.type === "password";
+          grokKeyInput.type = isPassword ? "text" : "password";
+          toggleGrokBtn.innerHTML = getIcon(isPassword ? "eye-off" : "eye", "", 16);
+        });
+      }
       const btnExport = document.getElementById("btn-export-data");
       if (btnExport) {
         btnExport.addEventListener("click", () => this.handleExportData());
@@ -6060,8 +6698,17 @@ ${JSON.stringify(fallbackItems)}
       this.closeAllModals();
       this.currentTab = tabId;
       if (tabId === "ai-plan") {
+        document.body.classList.add("tab-ai-plan");
         const badge = document.getElementById("ai-nav-badge");
         if (badge) badge.classList.add("hidden");
+        const chatHistoryEl = document.getElementById("chat-history");
+        if (chatHistoryEl) {
+          requestAnimationFrame(() => {
+            chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+          });
+        }
+      } else {
+        document.body.classList.remove("tab-ai-plan");
       }
       document.querySelectorAll(".nav-tab").forEach((t) => {
         if (t.getAttribute("data-target") === tabId) {

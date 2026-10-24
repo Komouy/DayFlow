@@ -8,6 +8,7 @@ import { getIcon, renderIcons } from '../icons.js';
 import { notifications } from '../notifications.js';
 import { particleBurst, springBounce } from '../animations.js';
 import { escapeHtml, detectScheduleConflicts, generateGoogleCalendarUrl } from '../utils/helpers.js';
+import { GeminiService } from '../gemini.js';
 
 export const scheduleViewMethods = {
   // --- 2. Schedule View ---
@@ -21,7 +22,9 @@ export const scheduleViewMethods = {
     }
 
     const listEl = document.getElementById('full-schedule-list');
-    this.renderTimelineGrid(schedules, listEl, false);
+    const isToday = !this.selectedScheduleDate || this.selectedScheduleDate === getLocalDateString();
+    this.renderTimelineGrid(schedules, listEl, isToday);
+    this.setupSwipeNavigation(listEl);
 
     // Date picker handler
     const dateInput = document.getElementById('schedule-date-filter');
@@ -165,11 +168,26 @@ export const scheduleViewMethods = {
         const id = toggleBtn.getAttribute('data-id');
         const targetDate = toggleBtn.getAttribute('data-date');
         const sch = state.getSchedules(targetDate).find(s => s.id === id);
-        if (!sch?.completed) {
+        const willComplete = !sch?.completed;
+
+        if (willComplete) {
           particleBurst(toggleBtn, 'var(--status-success)');
+          if (navigator.vibrate) {
+            try { navigator.vibrate([15, 30, 20]); } catch (e) {}
+          }
+          notifications.playChime('crystal');
         }
         springBounce(toggleBtn);
         state.toggleScheduleComplete(id, targetDate);
+
+        if (willComplete && sch) {
+          this.showUndoCompletionToast(id, targetDate, sch.title);
+        }
+        return;
+      }
+
+      // Allow Google Calendar link without triggering card click
+      if (target.closest('[data-action="gcal"]')) {
         return;
       }
 
@@ -197,6 +215,26 @@ export const scheduleViewMethods = {
           notifications.showToast('Jadwal berhasil dihapus.', 'info');
         }
         return;
+      }
+
+      // Click anywhere on card to open edit modal
+      const card = target.closest('.timeline-card');
+      if (card && !target.closest('button') && !target.closest('a')) {
+        const id = card.getAttribute('data-id');
+        if (id) {
+          this.openScheduleModal(id);
+        }
+      }
+    });
+
+    containerEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        const card = e.target.closest('.timeline-card');
+        if (card && e.target === card) {
+          e.preventDefault();
+          const id = card.getAttribute('data-id');
+          if (id) this.openScheduleModal(id);
+        }
       }
     });
   },
@@ -228,11 +266,35 @@ export const scheduleViewMethods = {
         <div class="empty-state">
           <div class="empty-state-icon">${getIcon('calendar', '', 20)}</div>
           <p class="empty-state-title">Tidak ada agenda ${isToday ? 'hari ini' : 'pada tanggal ini'}</p>
-          <p class="empty-state-desc">Gunakan tombol tambah di atas atau gunakan Rencana AI untuk merapikan kegiatanmu.</p>
+          <p class="empty-state-desc">Mulai hari dengan mencatat kegiatan atau susun jadwal otomatis bersama AI.</p>
+          <div class="empty-state-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-empty-add-schedule">
+              ${getIcon('plus', '', 14)} Tambah Jadwal
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-empty-ai-plan">
+              ${getIcon('bot', '', 14)} Rencana AI
+            </button>
+          </div>
           ${carryOverBtnHtml}
         </div>
       `;
       renderIcons(containerEl);
+
+      const addBtn = containerEl.querySelector('#btn-empty-add-schedule');
+      if (addBtn) {
+        addBtn.addEventListener('click', () => {
+          springBounce(addBtn);
+          this.openScheduleModal(null, isToday ? getLocalDateString() : this.selectedScheduleDate);
+        });
+      }
+
+      const aiPlanBtn = containerEl.querySelector('#btn-empty-ai-plan');
+      if (aiPlanBtn) {
+        aiPlanBtn.addEventListener('click', () => {
+          springBounce(aiPlanBtn);
+          this.switchTab('ai-plan');
+        });
+      }
 
       const carryBtn = containerEl.querySelector('#btn-carry-over-action');
       if (carryBtn) {
@@ -251,8 +313,51 @@ export const scheduleViewMethods = {
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const todayStr = getLocalDateString(now);
     const conflicts = detectScheduleConflicts(schedules);
+    const targetDate = schedules[0]?.date || this.selectedScheduleDate || getLocalDateString();
 
-    containerEl.innerHTML = schedules.map(s => {
+    let conflictBannerHtml = '';
+    if (conflicts.size > 0) {
+      conflictBannerHtml = `
+        <div class="conflict-resolver-banner" id="conflict-resolver-banner">
+          <div class="conflict-resolver-info">
+            <span class="conflict-resolver-icon">${getIcon('alert-triangle', '', 18)}</span>
+            <div class="conflict-resolver-text">
+              <span class="conflict-resolver-title">Ada ${conflicts.size} Jadwal Bertabrakan</span>
+              <span class="conflict-resolver-desc">Jadwal pada jam yang sama dapat membuyarkan fokus. AI dapat menata ulang jam luang secara otomatis.</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm conflict-resolver-btn" id="btn-resolve-conflicts">
+            ${getIcon('cpu', '', 14)} Selesaikan Bentrok
+          </button>
+        </div>
+      `;
+    }
+
+    const sortedSchedules = [...schedules].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+    const nowH = String(now.getHours()).padStart(2, '0');
+    const nowM = String(now.getMinutes()).padStart(2, '0');
+    const nowIndicatorHtml = `
+      <div class="timeline-row timeline-now-row">
+        <div class="timeline-time-col">
+          <span class="timeline-now-badge tabular-nums font-mono">${nowH}:${nowM}</span>
+        </div>
+        <div class="timeline-rail-col">
+          <div class="timeline-now-pulse-dot"></div>
+        </div>
+        <div class="timeline-card-col">
+          <div class="timeline-now-line-wrap">
+            <div class="timeline-now-line"></div>
+            <span class="timeline-now-label">Sekarang</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    let nowInserted = false;
+    let itemsHtml = '';
+
+    sortedSchedules.forEach(s => {
       const timeVal = s.time || '00:00';
       const parts = timeVal.split(':').map(Number);
       const h = isNaN(parts[0]) ? 0 : parts[0];
@@ -263,6 +368,12 @@ export const scheduleViewMethods = {
       const endM = String(endMinutes % 60).padStart(2, '0');
       const timeSpanText = `${timeVal} — ${endH}:${endM}`;
       const isActive = isToday && !s.completed && (s.date === todayStr) && currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+
+      // Insert Now indicator in chronological position
+      if (isToday && !nowInserted && currentMinutes < startMinutes) {
+        itemsHtml += nowIndicatorHtml;
+        nowInserted = true;
+      }
 
       // Priority badge
       let priorityBadgeHtml = '';
@@ -323,7 +434,7 @@ export const scheduleViewMethods = {
 
       const gcalUrl = generateGoogleCalendarUrl(s);
 
-      return `
+      itemsHtml += `
         <div class="timeline-row ${s.completed ? 'completed' : ''} ${isActive ? 'is-active' : ''} ${s.priority === 'high' ? 'priority-high-row' : ''} ${conflicts.has(s.id) ? 'timeline-row-conflict' : ''}">
           <!-- Column 1: Time -->
           <div class="timeline-time-col">
@@ -336,21 +447,51 @@ export const scheduleViewMethods = {
             <div class="timeline-line"></div>
           </div>
 
-          <!-- Column 3: Card Content -->
+          <!-- Column 3: Card Content (Click to edit) -->
           <div class="timeline-card-col">
-            <div class="timeline-card">
+            <div class="timeline-card" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(s.title)}, ${s.completed ? 'selesai' : 'belum selesai'}. Klik untuk mengubah">
               <div class="timeline-card-header">
-                <div style="display:flex; flex-direction:column; gap:4px; min-width:0; flex:1;">
+                <button type="button" 
+                        class="schedule-check-circle ${s.completed ? 'is-checked' : ''}" 
+                        data-action="toggle-complete" 
+                        data-id="${s.id}" 
+                        data-date="${s.date}"
+                        title="${s.completed ? 'Tandai belum selesai' : 'Tandai selesai'}"
+                        aria-label="${s.completed ? 'Tandai belum selesai' : 'Tandai selesai'}">
+                  ${s.completed ? getIcon('check', '', 12) : ''}
+                </button>
+
+                <div class="timeline-card-main-info">
                   <div class="timeline-card-title">${escapeHtml(s.title)}</div>
                   ${s.description ? `<div class="timeline-card-desc" style="font-size:12px; color:var(--text-secondary); line-height:1.4;">${escapeHtml(s.description)}</div>` : ''}
-                  <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                  <div class="timeline-badges-row">
+                    ${catBadgeHtml}
                     ${priorityBadgeHtml}
                     ${recurrenceBadgeHtml}
                     ${deadlineBadgeHtml}
                     ${conflictBadgeHtml}
                   </div>
                 </div>
-                ${catBadgeHtml}
+
+                <div class="timeline-card-quick-actions">
+                  <a href="${gcalUrl}" 
+                     target="_blank" 
+                     rel="noopener noreferrer" 
+                     class="card-icon-action" 
+                     title="Ekspor ke Google Calendar" 
+                     aria-label="Ekspor ke Google Calendar"
+                     data-action="gcal">
+                    ${getIcon('calendar', '', 13)}
+                  </a>
+                  <button type="button" 
+                          class="card-icon-action text-danger" 
+                          data-action="delete-schedule" 
+                          data-id="${s.id}" 
+                          title="Hapus Agenda" 
+                          aria-label="Hapus Agenda">
+                    ${getIcon('trash', '', 13)}
+                  </button>
+                </div>
               </div>
 
               <div class="timeline-card-footer">
@@ -359,38 +500,197 @@ export const scheduleViewMethods = {
                   <span class="tabular-nums">${timeSpanText} (${s.duration} min)</span>
                   ${isActive ? '<span class="status-live-tag">Aktif</span>' : ''}
                 </div>
-
-                <div class="timeline-card-actions">
-                  <a href="${gcalUrl}" 
-                     target="_blank" 
-                     rel="noopener noreferrer" 
-                     class="btn btn-ghost btn-xs" 
-                     title="Buka di Google Calendar" 
-                     aria-label="Buka di Google Calendar"
-                     style="display:inline-flex; align-items:center; color:var(--text-secondary);">
-                    ${getIcon('calendar', '', 13)}
-                  </a>
-                  <button class="btn btn-ghost btn-xs btn-check ${s.completed ? 'is-done' : ''}" 
-                          data-action="toggle-complete" 
-                          data-id="${s.id}" 
-                          data-date="${s.date}"
-                          title="${s.completed ? 'Tandai belum selesai' : 'Tandai selesai'}">
-                    ${getIcon(s.completed ? 'check-circle' : 'circle', '', 14)}
-                    <span>${s.completed ? 'Selesai' : 'Check'}</span>
-                  </button>
-                  <button class="btn btn-ghost btn-xs" data-action="edit-schedule" data-id="${s.id}" title="Ubah">
-                    ${getIcon('edit', '', 13)}
-                  </button>
-                  <button class="btn btn-ghost btn-xs text-muted" data-action="delete-schedule" data-id="${s.id}" title="Hapus">
-                    ${getIcon('trash', '', 13)}
-                  </button>
-                </div>
+                <span class="card-edit-hint">Ketuk untuk edit</span>
               </div>
             </div>
           </div>
         </div>
       `;
-    }).join('');
+    });
+
+    if (isToday && !nowInserted) {
+      itemsHtml += nowIndicatorHtml;
+      nowInserted = true;
+    }
+
+    containerEl.innerHTML = conflictBannerHtml + itemsHtml;
     renderIcons(containerEl);
+
+    // Bind resolve conflicts button if present
+    const resolveBtn = containerEl.querySelector('#btn-resolve-conflicts');
+    if (resolveBtn) {
+      resolveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        springBounce(resolveBtn);
+        this.handleResolveConflicts(conflicts, schedules, targetDate);
+      });
+    }
+  },
+
+  async handleResolveConflicts(conflicts, schedules, targetDate) {
+    if (!GeminiService.isAiReady()) {
+      notifications.showToast('Layanan AI belum siap. Hubungkan AI Gateway atau masukkan API Key di Pengaturan.', 'warning', 5000);
+      return;
+    }
+
+    const btn = document.getElementById('btn-resolve-conflicts');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Menata ulang...`;
+    }
+
+    try {
+      const solutions = await GeminiService.resolveScheduleConflicts(conflicts, schedules, targetDate);
+      if (!solutions || solutions.length === 0) {
+        notifications.showToast('Tidak ada rekomendasi pergeseran jadwal yang diperlukan.', 'info', 4000);
+        return;
+      }
+
+      this.openConflictResolverModal(solutions);
+    } catch (err) {
+      notifications.showToast(`Gagal merapikan bentrok: ${err.message}`, 'error', 6000);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        renderIcons(btn);
+      }
+    }
+  },
+
+  openConflictResolverModal(solutions) {
+    const modal = document.getElementById('modal-conflict-resolver');
+    const listEl = document.getElementById('conflict-solutions-list');
+    if (!modal || !listEl) return;
+
+    let html = '';
+    solutions.forEach(sol => {
+      html += `
+        <div class="conflict-solution-card">
+          <div class="conflict-solution-header">
+            <span class="conflict-solution-title">${escapeHtml(sol.title || 'Kegiatan')}</span>
+            <div class="conflict-solution-times">
+              <span class="conflict-old-time tabular-nums">${escapeHtml(sol.oldTime || '--:--')}</span>
+              <span class="conflict-arrow-icon">${getIcon('chevron-right', '', 12)}</span>
+              <span class="conflict-new-time tabular-nums font-mono font-bold">${escapeHtml(sol.newTime || '--:--')}</span>
+            </div>
+          </div>
+          ${sol.reason ? `<div class="conflict-solution-reason">${escapeHtml(sol.reason)}</div>` : ''}
+        </div>
+      `;
+    });
+
+    listEl.innerHTML = html;
+    renderIcons(modal);
+
+    const applyBtn = document.getElementById('btn-apply-conflict-solutions');
+    if (applyBtn) {
+      applyBtn.onclick = () => {
+        let appliedCount = 0;
+        solutions.forEach(sol => {
+          if (sol.id && sol.newTime) {
+            state.updateSchedule(sol.id, { time: sol.newTime });
+            appliedCount++;
+          }
+        });
+        window.dayflowApp.closeAllModals();
+        notifications.playChime('crystal');
+        notifications.showToast(`${appliedCount} jadwal berhasil disesuaikan tanpa tabrakan.`, 'success', 5000);
+      };
+    }
+
+    modal.classList.add('open');
+  },
+
+  showUndoCompletionToast(scheduleId, targetDate, title) {
+    const existing = document.getElementById('df-undo-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'df-undo-toast';
+    toast.className = 'undo-toast';
+    toast.innerHTML = `
+      <div class="undo-toast-content">
+        <span class="undo-toast-icon">${getIcon('check', '', 14)}</span>
+        <span class="undo-toast-text">Selesai: <strong>${escapeHtml(title || 'Kegiatan')}</strong></span>
+      </div>
+      <button type="button" class="btn btn-ghost btn-xs undo-toast-btn" id="btn-undo-schedule-complete">
+        ${getIcon('undo-2', '', 13)}
+        Urungkan
+      </button>
+    `;
+
+    document.body.appendChild(toast);
+    renderIcons(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.add('is-visible');
+    });
+
+    let cleared = false;
+    const dismissTimer = setTimeout(() => {
+      if (!cleared) {
+        cleared = true;
+        toast.classList.remove('is-visible');
+        setTimeout(() => toast.remove(), 250);
+      }
+    }, 5000);
+
+    const undoBtn = toast.querySelector('#btn-undo-schedule-complete');
+    if (undoBtn) {
+      undoBtn.addEventListener('click', () => {
+        if (!cleared) {
+          cleared = true;
+          clearTimeout(dismissTimer);
+          toast.classList.remove('is-visible');
+          setTimeout(() => toast.remove(), 250);
+          state.toggleScheduleComplete(scheduleId, targetDate);
+          notifications.showToast('Penyelesaian agenda berhasil diurungkan.', 'info', 3000);
+        }
+      });
+    }
+  },
+
+  setupSwipeNavigation(element) {
+    if (!element || element._hasSwipe) return;
+    element._hasSwipe = true;
+
+    let startX = 0;
+    let startY = 0;
+    let startTime = 0;
+
+    element.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startTime = Date.now();
+    }, { passive: true });
+
+    element.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length !== 1) return;
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const deltaX = endX - startX;
+      const deltaY = endY - startY;
+      const elapsed = Date.now() - startTime;
+
+      if (elapsed < 500 && Math.abs(deltaX) > 60 && Math.abs(deltaY) < 50) {
+        if (deltaX < 0) {
+          this.advanceScheduleDate(1);
+        } else {
+          this.advanceScheduleDate(-1);
+        }
+      }
+    }, { passive: true });
+  },
+
+  advanceScheduleDate(delta) {
+    const cur = new Date((this.selectedScheduleDate || getLocalDateString()) + 'T00:00:00');
+    cur.setDate(cur.getDate() + delta);
+    this.selectedScheduleDate = getLocalDateString(cur);
+    const dateInput = document.getElementById('schedule-date-filter');
+    if (dateInput) dateInput.value = this.selectedScheduleDate;
+    this.renderScheduleView();
   }
 };

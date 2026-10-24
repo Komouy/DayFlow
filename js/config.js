@@ -20,8 +20,12 @@ export const APP_CONFIG = {
   // Default Gemini Intelligence Model (Token-efficient & broad answers)
   DEFAULT_MODEL: 'gemini-2.5-flash',
 
+  // xAI Grok Fallback Configuration
+  GROK_API_URL: 'https://api.x.ai/v1/chat/completions',
+  DEFAULT_GROK_MODEL: 'grok-2-latest',
+
   // Version identifier
-  VERSION: '6.3.0'
+  VERSION: '6.4.0'
 };
 
 // Allow runtime override via global window object or localStorage for testing

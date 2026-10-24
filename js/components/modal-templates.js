@@ -64,7 +64,7 @@ export const MODALS_HTML = `
             <summary class="advanced-options-summary">
               <span style="display:inline-flex; align-items:center; gap:8px;">
                 <span data-icon="sliders" data-icon-size="14"></span>
-                <span>Pengaturan Tambahan (Kategori, Pengulangan, Prioritas)</span>
+                <span>Opsi Tambahan (Kategori, Prioritas & Pengingat)</span>
               </span>
               <span class="advanced-summary-chevron" data-icon="chevron-down" data-icon-size="14"></span>
             </summary>
@@ -430,10 +430,41 @@ export const MODALS_HTML = `
           </div>
         </div>
       </div>
+    <!-- Modal: AI Schedule Conflict Resolver (Bottom-sheet) -->
+    <div id="modal-conflict-resolver" class="modal-overlay" role="dialog" aria-modal="true">
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="text-orange" data-icon="sliders" data-icon-size="18"></span>
+            <h3 class="sheet-title">Rekomendasi Penataan Jadwal</h3>
+          </div>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="window.dayflowApp.closeAllModals()" aria-label="Tutup">
+            <span data-icon="x" data-icon-size="18"></span>
+          </button>
+        </div>
+
+        <div class="modal-form-clean" style="gap:14px;">
+          <p class="text-xs text-secondary" style="margin:0; line-height:1.5;">
+            AI telah menganalisis prioritas dan slot waktu luang tanpa menabrak agenda lain. Tinjau penyesuaian waktu berikut:
+          </p>
+
+          <div id="conflict-solutions-list" class="conflict-solutions-list">
+            <!-- Injected via schedule-view.js -->
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.dayflowApp.closeAllModals()">
+              Batal
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-apply-conflict-solutions">
+              <span data-icon="check" data-icon-size="14"></span>
+              Terapkan Jadwal Baru
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
-
-
-
 `;
 
 export function mountModals() {

@@ -680,20 +680,20 @@ export const todayViewMethods = {
 
     if (statusText) {
       if (prod.totalScheduled === 0) {
-        statusText.textContent = 'Tambahkan jadwal kegiatan untuk mengaktifkan target hari ini.';
+        statusText.textContent = 'Belum ada agenda hari ini.';
       } else if (prod.isComplete) {
-        statusText.textContent = 'Luar biasa! Seluruh agenda hari ini berhasil dituntaskan.';
+        statusText.textContent = 'Semua agenda hari ini telah tuntas!';
       } else {
         const remaining = prod.totalScheduled - prod.completedCount;
-        statusText.textContent = `${remaining} kegiatan lagi untuk mencapai 100% tuntas sebelum pukul 24:00.`;
+        statusText.textContent = `${remaining} kegiatan lagi hari ini.`;
       }
     }
 
     if (streakText) {
       if (stats.perfectDays > 0) {
-        streakText.textContent = `${stats.perfectDays} Hari Tuntas`;
+        streakText.textContent = `${stats.perfectDays} Hari Konsisten`;
       } else {
-        streakText.textContent = 'Target Hari Ini';
+        streakText.textContent = 'Mulai Konsistensi Hari Ini';
       }
     }
 
@@ -708,31 +708,33 @@ export const todayViewMethods = {
     } else if (!prod.isComplete) {
       this._lastCelebratedComplete = false;
     }
+
+    // Initialize clock & countdown ticking
+    this.initRealtimeClock();
   },
 
   initRealtimeClock() {
     const updateClock = () => {
+      const now = new Date();
       const clockEl = document.getElementById('banner-live-clock');
       if (clockEl) {
-        const now = new Date();
         const h = String(now.getHours()).padStart(2, '0');
         const m = String(now.getMinutes()).padStart(2, '0');
         const s = String(now.getSeconds()).padStart(2, '0');
         clockEl.textContent = `${h}:${m}:${s}`;
       }
+
+      // Live countdown on Today's progress widget
+      const countdownText = document.getElementById('today-countdown-text');
+      if (countdownText && !countdownText.textContent.includes('Tuntas 100%')) {
+        const prod = state.getTodayProductivity();
+        countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
+      }
     };
 
     updateClock();
     if (!this._realtimeClockInterval) {
-      this._realtimeClockInterval = setInterval(() => {
-        updateClock();
-        // Update countdown text every minute
-        const countdownText = document.getElementById('today-countdown-text');
-        if (countdownText && !countdownText.textContent.includes('Tuntas 100%')) {
-          const prod = state.getTodayProductivity();
-          countdownText.textContent = `Sisa ${prod.remainingTimeStr} hingga 24:00`;
-        }
-      }, 1000);
+      this._realtimeClockInterval = setInterval(updateClock, 1000);
     }
   }
 };

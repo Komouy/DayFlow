@@ -38,9 +38,6 @@
         <h1 class="brand-title">Day<span class="brand-title-accent">Flow</span></h1>
       </div>
       <div class="header-actions">
-        <button class="btn btn-ghost btn-sm btn-icon" id="btn-refresh-page" aria-label="Segarkan Halaman" title="Segarkan Halaman">
-          <span data-icon="refresh" data-icon-size="18"></span>
-        </button>
         <button class="btn btn-ghost btn-sm btn-icon" id="btn-toggle-theme" aria-label="Ganti Tema Tampilan" title="Beralih ke Mode Terang">
           <span data-icon="sun" data-icon-size="18"></span>
         </button>
@@ -153,16 +150,11 @@
           </div>
           <div class="alert-banner-content">
             <span class="alert-banner-title">Layanan AI Perlu Dikonfigurasi</span>
-            <span class="alert-banner-desc">Hubungkan Serverless AI Gateway atau masukkan API Key di Setelan untuk asisten cerdas terpusat.</span>
+            <span class="alert-banner-desc">Hubungkan Serverless AI Gateway atau masukkan API Key di Setelan untuk asisten cerdas.</span>
           </div>
-          <div style="display:flex; gap:6px; flex-shrink:0;">
-            <a href="/panduan-api.html" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration:none; font-size:12px;">
-              Tata Cara
-            </a>
-            <button class="btn btn-primary btn-sm alert-banner-action" onclick="window.dayflowApp.switchTab('settings')">
-              Pengaturan
-            </button>
-          </div>
+          <button class="btn btn-primary btn-sm alert-banner-action" onclick="window.dayflowApp.switchTab('settings')">
+            Pengaturan
+          </button>
         </div>
 
         <!-- Proactive AI Briefing / Reminder Card -->
@@ -180,11 +172,7 @@
           <div class="ai-nudge-actions">
             <button class="btn btn-primary btn-xs" id="btn-reply-ai-nudge">
               <span data-icon="message-square" data-icon-size="13"></span>
-              Bahas dengan AI
-            </button>
-            <button class="btn btn-secondary btn-xs" id="btn-view-deadline-tasks">
-              <span data-icon="clock" data-icon-size="13"></span>
-              Lihat Tugas Deadline
+              Buka Asisten AI
             </button>
           </div>
         </div>
@@ -240,9 +228,8 @@
                 <span class="badge-counter" id="today-stats-counter">0 / 0</span>
               </div>
               <div style="display:flex; align-items:center; gap:var(--space-2);">
-                <button class="btn btn-secondary btn-sm" id="btn-share-today" title="Bagikan Agenda Hari Ini">
+                <button class="btn btn-secondary btn-sm btn-icon" id="btn-share-today" title="Bagikan Agenda Hari Ini" aria-label="Bagikan Agenda Hari Ini">
                   <span data-icon="share" data-icon-size="14"></span>
-                  Bagikan
                 </button>
                 <button class="btn btn-primary btn-sm" id="btn-today-add-schedule" onclick="window.dayflowApp.openScheduleModal()">
                   <span data-icon="plus" data-icon-size="15"></span>
@@ -296,9 +283,8 @@
             <span class="section-title">Manajemen Jadwal</span>
           </div>
           <div style="display:flex; align-items:center; gap:var(--space-2);">
-            <button class="btn btn-secondary btn-sm" id="btn-share-schedule">
+            <button class="btn btn-secondary btn-sm btn-icon" id="btn-share-schedule" title="Bagikan Jadwal" aria-label="Bagikan Jadwal">
               <span data-icon="share" data-icon-size="14"></span>
-              Bagikan
             </button>
             <button class="btn btn-primary btn-sm" onclick="window.dayflowApp.openScheduleModal()">
               <span data-icon="plus" data-icon-size="15"></span>
@@ -364,7 +350,7 @@
         </div>
 
         <!-- Conversational Chat Stream -->
-        <div class="card" style="display:flex; flex-direction:column; gap:12px; height:600px;">
+        <div class="card ai-chat-card">
           <div class="quick-prompts">
             <button class="prompt-chip" data-prompt="Setiap hari jam 06:00 olahraga lari pagi">
               Jadwal Berulang
@@ -383,42 +369,44 @@
             </button>
           </div>
 
-          <div class="chat-history" id="chat-history" style="flex:1;">
+          <div class="chat-history" id="chat-history">
             <!-- Chat bubbles render here -->
           </div>
 
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding:0 2px;">
-            <label class="chat-auto-save-control">
-              <input type="checkbox" id="chat-auto-save-toggle">
-              <span>Simpan otomatis ke agenda</span>
-            </label>
-          </div>
-
-          <!-- Floating Attachment Preview (Image / Document) -->
-          <div id="chat-attachment-preview" class="chat-attachment-preview hidden">
-            <div class="attachment-preview-body">
-              <img id="attachment-preview-img" class="attachment-thumb hidden" alt="Pratinjau Gambar">
-              <div id="attachment-preview-doc" class="attachment-doc-badge hidden">
-                <span data-icon="file" data-icon-size="16"></span>
-                <span id="attachment-file-name" class="attachment-filename">dokumen.pdf</span>
-              </div>
-              <span id="attachment-file-size" class="attachment-filesize">0 KB</span>
-              <button type="button" id="btn-cancel-attachment" class="btn-cancel-attach" title="Hapus Lampiran" aria-label="Hapus Lampiran">
-                <span data-icon="x" data-icon-size="14"></span>
-              </button>
+          <div class="chat-bottom-dock">
+            <div class="chat-dock-meta">
+              <label class="chat-auto-save-control">
+                <input type="checkbox" id="chat-auto-save-toggle">
+                <span>Simpan otomatis ke agenda</span>
+              </label>
             </div>
-          </div>
 
-          <form id="chat-form" class="chat-input-bar">
-            <button type="button" id="btn-chat-attach-file" class="btn btn-ghost btn-sm btn-icon" title="Lampirkan Gambar atau Berkas (PDF,txt,docx,csv)" aria-label="Lampirkan Berkas">
-              <span data-icon="paperclip" data-icon-size="16"></span>
-            </button>
-            <input type="file" id="chat-file-input" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,text/markdown,application/json,.ics" class="hidden">
-            <input type="text" id="chat-input" class="chat-input" placeholder="Ketik rencana, jadwal, atau lampirkan foto/file" autocomplete="off">
-            <button type="submit" id="chat-submit-btn" class="btn btn-primary btn-sm btn-icon" aria-label="Kirim Pesan">
-              <span data-icon="send" data-icon-size="16"></span>
-            </button>
-          </form>
+            <!-- Floating Attachment Preview (Image / Document) -->
+            <div id="chat-attachment-preview" class="chat-attachment-preview hidden">
+              <div class="attachment-preview-body">
+                <img id="attachment-preview-img" class="attachment-thumb hidden" alt="Pratinjau Gambar">
+                <div id="attachment-preview-doc" class="attachment-doc-badge hidden">
+                  <span data-icon="file" data-icon-size="16"></span>
+                  <span id="attachment-file-name" class="attachment-filename">dokumen.pdf</span>
+                </div>
+                <span id="attachment-file-size" class="attachment-filesize">0 KB</span>
+                <button type="button" id="btn-cancel-attachment" class="btn-cancel-attach" title="Hapus Lampiran" aria-label="Hapus Lampiran">
+                  <span data-icon="x" data-icon-size="14"></span>
+                </button>
+              </div>
+            </div>
+
+            <form id="chat-form" class="chat-input-bar">
+              <button type="button" id="btn-chat-attach-file" class="btn btn-ghost btn-sm btn-icon" title="Lampirkan Gambar atau Berkas (PDF,txt,docx,csv)" aria-label="Lampirkan Berkas">
+                <span data-icon="paperclip" data-icon-size="16"></span>
+              </button>
+              <input type="file" id="chat-file-input" accept="image/jpeg,image/png,image/webp,application/pdf,text/plain,text/csv,text/markdown,application/json,.ics" class="hidden">
+              <input type="text" id="chat-input" class="chat-input" placeholder="Ketik rencana, jadwal, atau lampirkan foto/file" autocomplete="off">
+              <button type="submit" id="chat-submit-btn" class="btn btn-primary btn-sm btn-icon" aria-label="Kirim Pesan">
+                <span data-icon="send" data-icon-size="16"></span>
+              </button>
+            </form>
+          </div>
         </div>
       </section>
 
@@ -439,9 +427,9 @@
             <input type="search" id="notes-search-input" class="input-control" placeholder="Cari catatan..." style="padding-left:36px;">
             <span data-icon="search" data-icon-size="16" style="position:absolute; left:12px; top:14px; color:var(--text-muted); pointer-events:none;"></span>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-ai-search-notes" title="Cari atau rangkum dengan AI">
-            <span data-icon="search" data-icon-size="14"></span>
-            Cari
+          <button class="btn btn-secondary btn-sm" id="btn-ai-search-notes" title="Tanya AI untuk merangkum catatan">
+            <span data-icon="bot" data-icon-size="14"></span>
+            Rangkum AI
           </button>
         </div>
 
@@ -704,8 +692,34 @@
                 <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                   <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-api-key" style="font-size:12px; color:var(--status-danger);" title="Hapus Key Pribadi dari Browser Ini">
                     <span data-icon="trash" data-icon-size="13"></span>
-                    Hapus Key dari Browser Ini
+                    Hapus Gemini Key
                   </button>
+                </div>
+
+                <!-- xAI Grok Fallback Key -->
+                <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-subtle);">
+                  <label for="setting-grok-api-key" class="input-label" style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:6px; display:block;">
+                    xAI Grok API Key (Fallback Cadangan)
+                  </label>
+                  <div class="form-group" style="position:relative; display:flex; align-items:center; margin-bottom:6px;">
+                    <input type="password" id="setting-grok-api-key" class="input-control" placeholder="xai-..." autocomplete="off" style="padding-right:44px; font-family:var(--font-mono); font-size:13px;">
+                    <button type="button" id="btn-toggle-grok-key-visibility" class="btn btn-ghost btn-sm btn-icon" style="position:absolute; right:2px; height:40px; width:40px; color:var(--text-muted);" aria-label="Lihat atau Sembunyikan Grok Key" title="Tampilkan/Sembunyikan Grok Key">
+                      <span data-icon="eye" data-icon-size="16"></span>
+                    </button>
+                  </div>
+                  <span class="settings-row-desc" style="font-size:11px; margin-bottom:8px; display:block;">
+                    Jika Gemini mengalami kendala kuota atau sibuk (503/429), DayFlow otomatis mengalihkan proses ke engine Grok.
+                  </span>
+                  <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-secondary btn-xs" id="btn-test-grok-api" style="font-size:12px;">
+                      <span data-icon="zap" data-icon-size="12"></span>
+                      Uji Grok Key
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-xs" id="btn-clear-grok-api-key" style="font-size:12px; color:var(--status-danger);" title="Hapus Grok Key dari Browser Ini">
+                      <span data-icon="trash" data-icon-size="13"></span>
+                      Hapus Grok Key
+                    </button>
+                  </div>
                 </div>
               </div>
             </details>
@@ -832,7 +846,7 @@
             <div class="settings-column" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle);">
               <div class="settings-row-text" style="margin-bottom:10px;">
                 <span class="settings-row-title">Pilihan Melodi Bel</span>
-                <span class="settings-row-desc">Karakter nada harmonik lantang yang optimal di speaker HP.</span>
+                <span class="settings-row-desc">Ketuk untuk memilih dan mendengarkan nada pengingat.</span>
               </div>
               <div class="tone-picker-list" role="radiogroup" aria-label="Pilihan Melodi Bel">
                 <div class="tone-picker-item is-active" data-tone-val="crystal">
@@ -845,12 +859,11 @@
                         <span class="tone-item-name">Crystal Bell</span>
                         <span class="model-option-badge" style="background-color:var(--accent-primary-soft); color:var(--accent-primary); border-color:var(--accent-primary-border);">Cerah & Nyaring</span>
                       </div>
-                      <span class="tone-item-desc">Harmoni lonceng 4 nada jernih untuk speaker HP</span>
                     </div>
                   </div>
-                  <button type="button" class="btn-tone-listen" data-preview-tone="crystal" aria-label="Putar Crystal Bell" title="Dengarkan Suara">
-                    <span data-icon="volume" data-icon-size="15"></span>
-                  </button>
+                  <span class="text-xs text-muted" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span data-icon="volume" data-icon-size="14"></span>
+                  </span>
                 </div>
 
                 <div class="tone-picker-item" data-tone-val="marimba">
@@ -863,12 +876,11 @@
                         <span class="tone-item-name">Marimba</span>
                         <span class="model-option-badge">Hangat & Berisi</span>
                       </div>
-                      <span class="tone-item-desc">Akustik kayu natural dengan resonansi lembut</span>
                     </div>
                   </div>
-                  <button type="button" class="btn-tone-listen" data-preview-tone="marimba" aria-label="Putar Marimba" title="Dengarkan Suara">
-                    <span data-icon="volume" data-icon-size="15"></span>
-                  </button>
+                  <span class="text-xs text-muted" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span data-icon="volume" data-icon-size="14"></span>
+                  </span>
                 </div>
 
                 <div class="tone-picker-item" data-tone-val="digital">
@@ -881,12 +893,11 @@
                         <span class="tone-item-name">Digital Pulse</span>
                         <span class="model-option-badge">Modern & Tegas</span>
                       </div>
-                      <span class="tone-item-desc">Sintesis nada arpeggio futuristik untuk fokus</span>
                     </div>
                   </div>
-                  <button type="button" class="btn-tone-listen" data-preview-tone="digital" aria-label="Putar Digital Pulse" title="Dengarkan Suara">
-                    <span data-icon="volume" data-icon-size="15"></span>
-                  </button>
+                  <span class="text-xs text-muted" style="display:inline-flex; align-items:center; gap:4px;">
+                    <span data-icon="volume" data-icon-size="14"></span>
+                  </span>
                 </div>
               </div>
               <input type="hidden" id="setting-sound-tone" value="crystal">
@@ -894,8 +905,8 @@
 
             <div class="settings-row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle);">
               <div class="settings-row-text">
-                <span class="settings-row-title">Pengingat Proaktif AI (3x Sehari)</span>
-                <span class="settings-row-desc">AI menyapa duluan di pagi, siang, dan sore untuk memantau tugas & tenggat waktu.</span>
+                <span class="settings-row-title">Pengingat Proaktif AI</span>
+                <span class="settings-row-desc">AI menyapa di jam kerja untuk memantau agenda & tenggat.</span>
               </div>
               <label class="toggle-switch" for="setting-proactive" aria-label="Pengingat Proaktif AI">
                 <input type="checkbox" id="setting-proactive" checked class="toggle-input">
@@ -909,10 +920,10 @@
             <div class="settings-row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle); align-items:flex-start;">
               <div class="settings-row-text">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
-                  <span class="settings-row-title">Notifikasi Sistem (Layar & Status Bar)</span>
+                  <span class="settings-row-title">Notifikasi Layar & Pop-up</span>
                   <span id="notif-permission-badge" class="model-option-badge" style="font-size:11px; padding:2px 8px;">Memeriksa izin...</span>
                 </div>
-                <span class="settings-row-desc" id="notif-permission-desc">Pop-up pengingat langsung muncul di layar HP atau desktop saat ada jadwal mendekat.</span>
+                <span class="settings-row-desc" id="notif-permission-desc">Pengingat muncul di layar HP atau desktop saat ada jadwal mendekat.</span>
               </div>
               <label class="toggle-switch" for="setting-system-notif" aria-label="Notifikasi Pop-up Sistem">
                 <input type="checkbox" id="setting-system-notif" checked class="toggle-input">
@@ -935,13 +946,9 @@
             </div>
 
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px; flex-wrap:wrap;">
-              <button type="button" class="btn btn-ghost btn-sm" id="btn-test-chime" title="Dengarkan melodi bel akustik">
-                <span data-icon="volume" data-icon-size="14"></span>
-                <span>Uji Suara Saja</span>
-              </button>
               <button type="button" class="btn btn-secondary btn-sm" id="btn-test-system-notif" style="border-color:var(--accent-primary); color:var(--accent-primary); font-weight:600;" title="Kirim notifikasi lengkap: pop-up + suara + getar">
                 <span data-icon="bell" data-icon-size="14"></span>
-                <span>Uji Notifikasi Lengkap</span>
+                <span>Uji Notifikasi & Suara</span>
               </button>
             </div>
           </div>

@@ -292,10 +292,12 @@ const DEFAULT_SETTINGS = {
   heroBannerHeight: 'normal',
   heroBannerOverlay: 'medium',
   heroBannerQuote: 'Fokus pada hal penting hari ini.',
-  chatAutoSave: false
+  chatAutoSave: false,
+  grokApiKey: '',
+  grokModel: 'grok-2-latest'
 };
 
-class StateManager {
+export class StateManager {
   constructor() {
     this.subscribers = new Set();
     this.schedules = this._load(STORAGE_KEYS.SCHEDULES, DEFAULT_SCHEDULES) || [];
@@ -454,6 +456,7 @@ class StateManager {
   }
 
   _load(key, fallback) {
+    if (typeof localStorage === 'undefined') return fallback;
     try {
       const data = localStorage.getItem(key);
       if (!data) return fallback;
@@ -469,6 +472,7 @@ class StateManager {
   }
 
   _save(key, val) {
+    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(key, JSON.stringify(val));
     } catch (e) {
@@ -666,30 +670,69 @@ class StateManager {
       const safeDate = normalizeDateString(item.date);
       const safeTime = normalizeTimeString(item.time);
 
-      const newSchedule = {
-        id: 'sch_' + (baseTime + index) + '_' + Math.random().toString(36).substr(2, 6),
-        date: safeDate,
-        time: safeTime,
-        duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
-        title: safeTitle,
-        description: safeDescription,
-        category: (item.category && typeof item.category === 'string') ? item.category.trim() : (item.kategori || 'Fokus'),
-        priority: ['low', 'medium', 'high'].includes(item.priority) ? item.priority : 'medium',
-        deadline: item.deadline ? normalizeDateString(item.deadline) : null,
-        reminder: item.reminder !== false,
-        recurrence: ['none', 'daily', 'weekdays', 'weekly', 'monthly'].includes(item.recurrence) ? item.recurrence : 'none',
-        completedDates: Array.isArray(item.completedDates) ? item.completedDates : [],
-        completed: !!item.completed,
-        createdAt: baseTime + index
-      };
-      newSchedules.push(newSchedule);
+      // Check if existing schedule matches (by id, or by normalized title & date, or for weekly recurrence by title & weekday)
+      const cleanNormTitle = (t) => String(t || '').toLowerCase().replace(/^(?:kuliah|mata\s+kuliah|matkul)\s+/i, '').replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+      const incomingNorm = cleanNormTitle(safeTitle);
+
+      const existingIdx = this.schedules.findIndex(existing => {
+        if (!existing || typeof existing !== 'object') return false;
+        if (item.id && existing.id === item.id) return true;
+        const existNorm = cleanNormTitle(existing.title);
+        if (existNorm && existNorm === incomingNorm) {
+          // If exact date matches
+          if (existing.date === safeDate) return true;
+          // If both are weekly recurrence and fall on the same day of the week
+          if (existing.recurrence === 'weekly' && item.recurrence === 'weekly') {
+            const eDay = new Date(existing.date + 'T00:00:00').getDay();
+            const iDay = new Date(safeDate + 'T00:00:00').getDay();
+            if (eDay === iDay) return true;
+          }
+        }
+        return false;
+      });
+
+      if (existingIdx !== -1) {
+        // Update existing schedule in place (avoids duplicate items on revision)
+        this.schedules[existingIdx] = {
+          ...this.schedules[existingIdx],
+          date: safeDate,
+          time: safeTime,
+          duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
+          title: safeTitle,
+          description: safeDescription || this.schedules[existingIdx].description,
+          category: (item.category && typeof item.category === 'string') ? item.category.trim() : (this.schedules[existingIdx].category || 'Fokus'),
+          priority: ['low', 'medium', 'high'].includes(item.priority) ? item.priority : this.schedules[existingIdx].priority,
+          deadline: item.deadline ? normalizeDateString(item.deadline) : this.schedules[existingIdx].deadline,
+          recurrence: ['none', 'daily', 'weekdays', 'weekly', 'monthly'].includes(item.recurrence) ? item.recurrence : this.schedules[existingIdx].recurrence
+        };
+        newSchedules.push(this.schedules[existingIdx]);
+      } else {
+        const newSchedule = {
+          id: 'sch_' + (baseTime + index) + '_' + Math.random().toString(36).substr(2, 6),
+          date: safeDate,
+          time: safeTime,
+          duration: Math.max(5, parseInt(item.duration || item.durasi, 10) || 30),
+          title: safeTitle,
+          description: safeDescription,
+          category: (item.category && typeof item.category === 'string') ? item.category.trim() : (item.kategori || 'Fokus'),
+          priority: ['low', 'medium', 'high'].includes(item.priority) ? item.priority : 'medium',
+          deadline: item.deadline ? normalizeDateString(item.deadline) : null,
+          reminder: item.reminder !== false,
+          recurrence: ['none', 'daily', 'weekdays', 'weekly', 'monthly'].includes(item.recurrence) ? item.recurrence : 'none',
+          completedDates: Array.isArray(item.completedDates) ? item.completedDates : [],
+          completed: !!item.completed,
+          createdAt: baseTime + index
+        };
+        this.schedules.push(newSchedule);
+        newSchedules.push(newSchedule);
+      }
     });
 
     if (newSchedules.length > 0) {
-      this.schedules.push(...newSchedules);
       this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
       const uniqueDates = [...new Set(newSchedules.map(s => s.date))];
       uniqueDates.forEach(d => this.syncDailyProductivity(d));
+      this.syncDailyProductivity();
       this.notify('schedules:batch-added', newSchedules);
     }
 
@@ -745,9 +788,13 @@ class StateManager {
       } else {
         compDates.push(dateToCheck);
       }
-      return this.updateSchedule(id, { completedDates: compDates });
+      const res = this.updateSchedule(id, { completedDates: compDates });
+      this.syncDailyProductivity(dateToCheck);
+      return res;
     } else {
-      return this.updateSchedule(id, { completed: !item.completed });
+      const res = this.updateSchedule(id, { completed: !item.completed });
+      if (targetDate) this.syncDailyProductivity(targetDate);
+      return res;
     }
   }
 
@@ -757,6 +804,7 @@ class StateManager {
     this.schedules = this.schedules.filter(s => s.id !== id);
     this._save(STORAGE_KEYS.SCHEDULES, this.schedules);
     if (itemDate) this.syncDailyProductivity(itemDate);
+    this.syncDailyProductivity(); // Also ensure today's progress bar updates
     this.notify('schedule:deleted', id);
   }
 

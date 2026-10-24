@@ -383,6 +383,27 @@ class AppController {
       });
     }
 
+    // Grok Fallback Key Controls
+    const testGrokBtn = document.getElementById('btn-test-grok-api');
+    if (testGrokBtn) {
+      testGrokBtn.addEventListener('click', () => this.handleTestGrokApiKey());
+    }
+
+    const clearGrokBtn = document.getElementById('btn-clear-grok-api-key');
+    if (clearGrokBtn) {
+      clearGrokBtn.addEventListener('click', () => this.handleClearGrokApiKey());
+    }
+
+    const toggleGrokBtn = document.getElementById('btn-toggle-grok-key-visibility');
+    const grokKeyInput = document.getElementById('setting-grok-api-key');
+    if (toggleGrokBtn && grokKeyInput) {
+      toggleGrokBtn.addEventListener('click', () => {
+        const isPassword = grokKeyInput.type === 'password';
+        grokKeyInput.type = isPassword ? 'text' : 'password';
+        toggleGrokBtn.innerHTML = getIcon(isPassword ? 'eye-off' : 'eye', '', 16);
+      });
+    }
+
     // Export & Import
     const btnExport = document.getElementById('btn-export-data');
     if (btnExport) {
@@ -599,10 +620,19 @@ class AppController {
     this.closeAllModals();
     this.currentTab = tabId;
 
-    // Clear unread badge when entering AI tab
+    // Toggle tab-ai-plan on body for mobile viewport & fixed chat dock
     if (tabId === 'ai-plan') {
+      document.body.classList.add('tab-ai-plan');
       const badge = document.getElementById('ai-nav-badge');
       if (badge) badge.classList.add('hidden');
+      const chatHistoryEl = document.getElementById('chat-history');
+      if (chatHistoryEl) {
+        requestAnimationFrame(() => {
+          chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+        });
+      }
+    } else {
+      document.body.classList.remove('tab-ai-plan');
     }
 
     // Update nav classes

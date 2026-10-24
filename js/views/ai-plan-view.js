@@ -49,7 +49,9 @@ export const aiPlanViewMethods = {
         if (dayIdx !== undefined) {
           const nowObj = new Date();
           let diff = dayIdx - nowObj.getDay();
-          if (diff <= 0) diff += 7;
+          const isNextWeek = /\b(?:minggu\s+depan|depan)\b/i.test(chunk);
+          if (diff < 0) diff += 7;
+          if (isNextWeek && diff === 0) diff += 7;
           const targetDay = new Date(nowObj);
           targetDay.setDate(targetDay.getDate() + diff);
           currentContextDate = getLocalDateString(targetDay);
@@ -86,7 +88,9 @@ export const aiPlanViewMethods = {
             if (new RegExp(`\\b(?:hari\\s+)?${dayName}\\b`, 'i').test(lower)) {
               const nowObj = new Date();
               let diff = dayIdx - nowObj.getDay();
-              if (diff <= 0) diff += 7;
+              const isNextWeek = /\b(?:minggu\s+depan|depan)\b/i.test(lower);
+              if (diff < 0) diff += 7;
+              if (isNextWeek && diff === 0) diff += 7;
               const targetDay = new Date(nowObj);
               targetDay.setDate(targetDay.getDate() + diff);
               itemDate = getLocalDateString(targetDay);
@@ -739,6 +743,27 @@ export const aiPlanViewMethods = {
         });
       }
     });
+
+    // Mobile keyboard awareness: keep chat scrolled to bottom when input is focused or viewport resizes
+    if (chatInput && !chatInput._hasFocusScrollHandler) {
+      chatInput._hasFocusScrollHandler = true;
+      chatInput.addEventListener('focus', () => {
+        setTimeout(() => {
+          const ch = document.getElementById('chat-history');
+          if (ch) ch.scrollTop = ch.scrollHeight;
+        }, 150);
+      });
+    }
+
+    if (window.visualViewport && !window._hasVisualViewportChatHandler) {
+      window._hasVisualViewportChatHandler = true;
+      window.visualViewport.addEventListener('resize', () => {
+        if (document.body.classList.contains('tab-ai-plan')) {
+          const ch = document.getElementById('chat-history');
+          if (ch) ch.scrollTop = ch.scrollHeight;
+        }
+      });
+    }
   },
 
   setupChatDelegation(containerEl) {

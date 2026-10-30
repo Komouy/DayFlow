@@ -22,10 +22,11 @@ const CORS_HEADERS = {
 };
 
 const FALLBACK_MODELS = [
-  'gemini-3.5-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-3.6-flash',
-  'gemini-2.5-flash'
+  'gemini-2.0-flash-lite',
+  'gemini-2.0-flash-lite-preview',
+  'gemini-1.5-flash-8b-latest',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash'
 ];
 
 /**
@@ -181,7 +182,7 @@ export default {
     try {
       const reqBody = await request.json();
       
-      let model = reqBody.model || 'gemini-3.5-flash-lite';
+      let model = reqBody.model || 'gemini-2.0-flash-lite';
       let payload = reqBody.payload || reqBody;
       const requestedProvider = reqBody.provider || 'gemini'; // 'gemini' | 'groq'
 
@@ -245,9 +246,10 @@ export default {
             const errMsg = resData?.error?.message || `HTTP ${status}`;
             geminiErr = { status, message: errMsg, model: currentModel };
 
-            if (status === 400) {
-              throw new Error(errMsg);
-            }
+            const lowerErr = errMsg.toLowerCase();
+            const canTryFallback = status === 404 || status === 429 || status >= 500 ||
+              (status === 400 && /(location|support|found)/.test(lowerErr));
+            if (!canTryFallback) break;
           } catch (fetchErr) {
             geminiErr = { status: 500, message: fetchErr.message, model: currentModel };
           }

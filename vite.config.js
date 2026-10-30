@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
 import fs from 'fs';
 
 export default defineConfig({
   server: {
     port: 3000,
-    host: true, // Listen on all network addresses (0.0.0.0) so phone can connect via WiFi
+    host: true,
     open: false,
     cors: true
   },
@@ -18,12 +20,13 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(import.meta.dirname, 'index.html'),
-        panduan: resolve(import.meta.dirname, 'panduan-api.html')
+        main: resolve(import.meta.dirname, 'index.html')
       }
     }
   },
   plugins: [
+    tailwindcss(),
+    react(),
     {
       name: 'copy-pwa-assets',
       closeBundle() {
@@ -36,7 +39,7 @@ export default defineConfig({
             fs.copyFileSync(src, resolve(dist, file));
           }
         }
-        const dirsToCopy = ['icons', 'css', 'js'];
+        const dirsToCopy = ['icons'];
         for (const dir of dirsToCopy) {
           const src = resolve(root, dir);
           const dest = resolve(dist, dir);

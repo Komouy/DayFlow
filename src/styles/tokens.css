@@ -1,0 +1,136 @@
+/* DayFlow Design Tokens (Anti-Slop Archetype: True Pitch Black & Frosted Pure White Glass) */
+
+:root,
+[data-theme="dark"] {
+  /* True Pitch Black (Hitam Pekat / OLED Deep Obsidian) Surface Hierarchy */
+  --bg-canvas: #000000;
+  --bg-surface: #0a0a0a;
+  --bg-surface-elevated: #121212;
+  --bg-surface-hover: #171717;
+  --bg-surface-active: #1f1f1f;
+  --bg-input: #080808;
+  --bg-sidebar: #050505;
+  --bg-header: rgba(0, 0, 0, 0.88);
+  --bg-nav: rgba(4, 4, 4, 0.94);
+  --bg-glass: rgba(10, 10, 10, 0.88);
+
+  /* Hairline Crisp Glass Borders for Deep Pitch Black */
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --border-hover: rgba(255, 255, 255, 0.28);
+  --border-focus: rgba(249, 115, 22, 0.65);
+  --border-specular: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  /* Warm Crystalline Orange Accent Tokens */
+  --accent-primary: #f97316;
+  --accent-primary-hover: #ea580c;
+  --accent-primary-active: #c2410c;
+  --accent-primary-soft: rgba(249, 115, 22, 0.14);
+  --accent-primary-border: rgba(249, 115, 22, 0.35);
+  --accent-primary-gradient: linear-gradient(180deg, #ff7a1a 0%, #ea580c 100%);
+  --accent-primary-gradient-hover: linear-gradient(180deg, #ff8c38 0%, #f97316 100%);
+  --accent-primary-gradient-active: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+  --accent-foreground: #ffffff;
+
+  /* Frosted Glass Filters */
+  --backdrop-glass: blur(20px) saturate(180%);
+  --backdrop-glass-sm: blur(12px) saturate(160%);
+  --backdrop-glass-lg: blur(28px) saturate(190%);
+
+  /* Functional Status Colors (Semantics) */
+  --status-success: #10b981;
+  --status-success-soft: rgba(16, 185, 129, 0.14);
+  --status-warning: #f59e0b;
+  --status-warning-soft: rgba(245, 158, 11, 0.14);
+  --status-danger: #ef4444;
+  --status-danger-soft: rgba(239, 68, 68, 0.14);
+  --status-info: #0ea5e9;
+  --status-info-soft: rgba(14, 165, 233, 0.14);
+
+  /* Text & Readability (Crisp High-Contrast on Pitch Black) */
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-inverse: #000000;
+
+  /* Typography & Tabular Numbers */
+  --font-display: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* Strict Spacing Scale (4px/8pt cadence) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Micro-Geometry Radii */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Glassmorphic Specular Shadows for Pitch Black */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+  /* Animation Timings */
+  --ease-snappy: cubic-bezier(0.23, 1, 0.32, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 180ms;
+}
+
+/* Light Mode (Clean, crisp, high-contrast, pure white & slate surfaces with warm tactile accents) */
+[data-theme="light"] {
+  --bg-canvas: #f1f3f6;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-surface-hover: #f1f5f9;
+  --bg-surface-active: #e2e8f0;
+  --bg-input: #f8fafc;
+  --bg-sidebar: #f8f9fb;
+  --bg-header: rgba(255, 255, 255, 0.9);
+  --bg-nav: rgba(255, 255, 255, 0.94);
+  --bg-glass: rgba(255, 255, 255, 0.88);
+
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-medium: rgba(15, 23, 42, 0.14);
+  --border-hover: rgba(15, 23, 42, 0.24);
+  --border-focus: rgba(234, 88, 12, 0.65);
+  --border-specular: inset 0 1px 0 rgba(255, 255, 255, 1);
+
+  --accent-primary: #ea580c;
+  --accent-primary-hover: #c2410c;
+  --accent-primary-active: #9a3412;
+  --accent-primary-soft: rgba(234, 88, 12, 0.1);
+  --accent-primary-border: rgba(234, 88, 12, 0.28);
+  --accent-primary-gradient: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+  --accent-primary-gradient-hover: linear-gradient(180deg, #fb923c 0%, #ea580c 100%);
+  --accent-primary-gradient-active: linear-gradient(180deg, #ea580c 0%, #c2410c 100%);
+  --accent-foreground: #ffffff;
+
+  --status-success: #16a34a;
+  --status-success-soft: rgba(22, 163, 74, 0.12);
+  --status-warning: #d97706;
+  --status-warning-soft: rgba(217, 119, 6, 0.12);
+  --status-danger: #dc2626;
+  --status-danger-soft: rgba(220, 38, 38, 0.12);
+  --status-info: #0284c7;
+  --status-info-soft: rgba(2, 132, 199, 0.12);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.1), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+}

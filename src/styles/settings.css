@@ -1,0 +1,541 @@
+/* ==========================================================================
+   12. Backup Center & Universal iCalendar Export Modal
+   ========================================================================== */
+
+/* Settings Hub Card */
+.backup-hub-settings-card {
+  background: var(--bg-surface-elevated, rgba(24, 24, 27, 0.7));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl, 16px);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.25);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.backup-hub-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.backup-hub-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(249, 115, 22, 0.12);
+  color: var(--accent-primary, #f97316);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.backup-hub-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.015em;
+}
+
+.backup-hub-desc {
+  font-size: 0.825rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.backup-hub-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  background: var(--bg-surface, rgba(18, 18, 20, 0.5));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-lg, 12px);
+  padding: 0.85rem 1rem;
+}
+
+.backup-hub-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.backup-hub-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-primary, #f97316);
+  font-family: var(--font-mono, monospace);
+  line-height: 1.2;
+}
+
+.backup-hub-stat-label {
+  font-size: 0.725rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.2rem;
+}
+
+.backup-hub-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+/* Modal Specific Layout */
+.backup-modal-sheet {
+  max-width: 620px;
+  width: 100%;
+}
+
+.backup-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.backup-modal-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(249, 115, 22, 0.12);
+  color: var(--accent-primary, #f97316);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Segmented Tabs */
+.backup-tabs-row {
+  display: flex;
+  background: var(--bg-surface-elevated, rgba(30, 30, 35, 0.6));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 1.25rem;
+}
+
+.backup-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.backup-tab-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.backup-tab-btn.active {
+  color: #ffffff;
+  background: var(--accent-primary, #f97316);
+  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.35);
+}
+
+.backup-tab-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.15rem 0.4rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.backup-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: fadeInPane 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInPane {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Current Stats Card */
+.backup-current-stats-card {
+  background: var(--bg-surface, rgba(22, 22, 26, 0.6));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.07));
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+}
+
+.backup-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.backup-stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+}
+
+.backup-stat-num {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  line-height: 1.2;
+}
+
+.backup-stat-lbl {
+  font-size: 0.675rem;
+  color: var(--text-tertiary);
+  margin-top: 0.15rem;
+}
+
+/* Action Boxes */
+.backup-action-box {
+  background: var(--bg-surface, rgba(22, 22, 26, 0.5));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 14px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.backup-action-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.backup-action-title {
+  font-size: 0.925rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.2rem 0;
+}
+
+.backup-action-subtitle {
+  font-size: 0.775rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.backup-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  border: none;
+  background: var(--accent-primary, #f97316);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.28);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  width: 100%;
+}
+
+.backup-download-btn:hover {
+  background: var(--accent-primary-hover, #ea580c);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+}
+
+/* Dropzone Upload Button */
+.backup-dropzone-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 1.5rem 1rem;
+  border-radius: 12px;
+  border: 2px dashed var(--border-focus, rgba(249, 115, 22, 0.4));
+  background: rgba(249, 115, 22, 0.03);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.backup-dropzone-btn:hover {
+  border-color: var(--accent-primary, #f97316);
+  background: rgba(249, 115, 22, 0.07);
+  transform: translateY(-1px);
+}
+
+.backup-dropzone-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.backup-dropzone-hint {
+  font-size: 0.725rem;
+  color: var(--text-tertiary);
+}
+
+.backup-file-input-hidden {
+  display: none !important;
+}
+
+/* File Preview Card */
+.backup-preview-card {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.backup-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.backup-preview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.backup-preview-pill {
+  font-size: 0.725rem;
+  padding: 0.25rem 0.55rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+
+/* Restore Mode Selector */
+.backup-mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.backup-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.backup-mode-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.backup-mode-option.active {
+  background: rgba(249, 115, 22, 0.09);
+  border-color: rgba(249, 115, 22, 0.4);
+}
+
+.backup-mode-radio {
+  margin-top: 0.25rem;
+  accent-color: var(--accent-primary, #f97316);
+  cursor: pointer;
+}
+
+.backup-mode-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.backup-mode-title {
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.backup-mode-desc {
+  font-size: 0.725rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  margin-top: 0.1rem;
+}
+
+.backup-restore-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1.15rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  background: #22c55e;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.backup-restore-confirm-btn:hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, 0.45);
+}
+
+/* iCalendar Scope Grid */
+.backup-scope-options-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+}
+
+.backup-scope-option {
+  display: flex;
+  flex-direction: column;
+  padding: 0.85rem;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.backup-scope-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.backup-scope-option.active {
+  background: rgba(249, 115, 22, 0.1);
+  border-color: var(--accent-primary, #f97316);
+  box-shadow: 0 0 0 1px var(--accent-primary, #f97316);
+}
+
+.backup-scope-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.backup-scope-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.backup-scope-count {
+  font-size: 0.725rem;
+  font-weight: 700;
+  color: var(--accent-primary, #f97316);
+  background: rgba(249, 115, 22, 0.15);
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  font-family: var(--font-mono, monospace);
+}
+
+.backup-scope-desc {
+  font-size: 0.725rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+/* iCal Import Guide Card */
+.backup-guide-card {
+  background: var(--bg-surface, rgba(22, 22, 26, 0.5));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.backup-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.75rem;
+}
+
+.backup-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.backup-guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-size: 0.775rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.backup-guide-step strong {
+  color: var(--text-primary);
+}
+
+.backup-guide-step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  font-size: 0.675rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+

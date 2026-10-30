@@ -6,10 +6,11 @@
   "main": "index.html",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:bundle && vite build",
-    "build:bundle": "npx esbuild js/app.js --bundle --outfile=js/bundle.js --format=iife && npx esbuild js/app.js --bundle --outfile=js/bundle.v5.js --format=iife",
+    "build": "vite build",
+    "test": "node --test",
     "preview": "vite preview",
-    "start": "vite preview"
+    "start": "vite preview",
+    "deploy": "vite build && firebase deploy --only hosting"
   },
   "keywords": [
     "pwa",
@@ -20,6 +21,22 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "playwright": "^1.64.1",
     "vite": "^8.3.4"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "jszip": "^3.10.2",
+    "lucide-react": "^1.61.0",
+    "mammoth": "^1.13.0",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.3"
   }
 }

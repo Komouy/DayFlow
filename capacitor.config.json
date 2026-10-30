@@ -1,0 +1,12 @@
+{
+  "appId": "com.dayflow.ai",
+  "appName": "DayFlow AI",
+  "webDir": "dist",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#ea580c"
+    }
+  }
+}
+

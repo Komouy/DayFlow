@@ -187,11 +187,11 @@
 
 @media (min-width: 641px) and (max-width: 1023px) {
   .main-viewport:has(.view-ai-redesign) {
-    padding: 8px 8px 82px !important;
+    padding: 6px 8px calc(68px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .unified-ai-card {
-    height: calc(100dvh - 54px - 8px - 88px - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - 54px - 68px - 6px - env(safe-area-inset-bottom, 0px));
     min-height: 360px;
   }
 }

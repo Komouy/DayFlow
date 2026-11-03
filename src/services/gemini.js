@@ -196,13 +196,20 @@ Karakteristik & Aturan Wajib:
 4. STRICT FIDELITY & PERENCANAAN JADWAL CERDAS:
 - Jika pengguna meminta 1 kegiatan spesifik (contoh: "jadwalkan koding besok pukul 08:00" atau "jadwal kuliah DDP Jumat jam 08.00"):
   * Tag [DAYFLOW_SCHEDULES] HANYA BOLEH BERISI 1 KEGIATAN ITU SAJA! Dilarang menambahkan kegiatan pengisi yang tidak diminta (seperti "Persiapan", "Buffer Time").
+- Jika pengguna meminta beberapa pengingat tugas/tenggat/kegiatan sekaligus (contoh: "ingatkan kumpul UTS Aqidah Akhlak hari Kamis dan UTS PSI hari Rabu jam 1 siang"):
+  * Tag [DAYFLOW_SCHEDULES] WAJIB BERISI SEMUA KEGIATAN TERSEBUT dalam 1 array JSON terpadu!
 - Jika pengguna MEMINTA bantuan menyusun jadwal harian / time-blocking (contoh: "susun jadwal fokus kerja dan istirahat hari ini mulai jam 08:30", "susun jadwal harian hari ini", "atur jadwal seharian hari ini"):
   * Berikan pembagian sesi kerja dan istirahat yang realistis dan terstruktur.
   * WAJIB menyertakan blok [DAYFLOW_SCHEDULES] berisi daftar kegiatan tersebut.
   * WAJIB memberikan nama/judul kegiatan yang NYATA dan JELAS (contoh: "Fokus Kerja Sesi 1", "Istirahat Makan Siang", "Fokus Kerja Sesi 2", "Evaluasi Harian").
   * DILARANG KERAS menggunakan teks placeholder atau sensor seperti "[Nama Kegiatan]", "****", "____", "Aktivitas", atau "Dan Seterusnya". Setiap kegiatan harus memiliki judul yang bermakna.
   * Gunakan waktu/tanggal yang disebut pengguna dan jadwal tersimpan sebagai batasan. Jika pengguna memang meminta rencana fleksibel dan memberi tanggal/hari, kamu boleh mengusulkan slot waktu; sebutkan asumsi penting secara singkat.
-4a. JANGAN MENEBak DETAIL WAJIB: Untuk satu kegiatan atau jadwal spesifik, jika tanggal/hari atau waktu mulai belum jelas dari pesan pengguna/lampiran/konteks percakapan pengguna, tanyakan hanya detail yang belum ada dan JANGAN sertakan blok [DAYFLOW_SCHEDULES]. Jangan mengganti detail kosong dengan hari ini, pukul 09:00, durasi, tenggat, lokasi, atau fakta buatan. Batas waktu tugas tidak otomatis berarti waktu mulai kegiatan.
+4a. KELENGKAPAN TANGGAL & WAKTU PADA PENGINGAT/DEADLINE/TUGAS:
+- Untuk permintaan tugas/deadline/pengingat yang sudah menyebutkan hari atau tanggal (contoh: "kumpulkan UTS Aqidah Akhlak pada hari Kamis", "ingatkan tugas Fisika besok", "kumpul UTS PSI hari rabu jam 1 siang"):
+  * Jika jam belum disebutkan secara rinci oleh pengguna (misal hanya menyebut "hari Kamis"), JANGAN menolak atau membatalkan usulan jadwal! WAJIB TETAP BUATKAN jadwal di dalam tag [DAYFLOW_SCHEDULES] dengan alokasi waktu pengingat standar yang wajar (misalnya "09:00" pagi), durasi 30 menit, priority "high", dan deadline sesuai tanggal tersebut.
+  * Jika jam sudah disebutkan (misal "jam 1 siang"), gunakan waktu yang diminta ("13:00").
+  * Di pesan teks jawaban, jelaskan secara ramah kegiatan apa saja yang telah dijadwalkan, sebutkan bahwa kegiatan yang belum memiliki jam spesifik diatur pengingatnya pada pukul 09:00 pagi, dan pengguna dapat langsung menyimpannya atau menyesuaikan jamnya sesuai kebutuhan.
+- Hanya jika hari atau tanggal SAMA SEKALI TIDAK ADA (contoh: hanya "ingatkan kumpul UTS" tanpa hari, tanggal, atau konteks waktu apapun), barulah tanyakan tanggal/hari yang dimaksud dan JANGAN sertakan blok [DAYFLOW_SCHEDULES].
 5. PEMAHAMAN WAKTU "JAM X - SELESAI" / "SAMPAI SELESAI":
 - Pahami variasi kalimat waktu fleksibel seperti: "08.00 - selesai", "jam 8 sampai selesai", "08:00 s/d selesai", atau "jam 8 hingga selesai".
 - Artinya kegiatan dimulai pada jam tersebut ("time": "08:00").
@@ -1534,7 +1541,7 @@ Instruksi Optimasi:
       const time = `${String(Number(timeMatch[1])).padStart(2, '0')}:${timeMatch[2]}`;
       const lastTurn = userContext.trim().split('\n').pop().trim();
       const isBareConfirmation = /^(?:ya|iya|ok|oke|baik|yes|yup|y|siap)[.!]?$/i.test(lastTurn);
-      const isReminderOrTask = !isBareConfirmation && /\b(?:ingat|ingatkan|pengingat|kumpul|kumpulkan|uts|uas|tugas|deadline|tenggat|ujian|pr)\b/i.test(lastTurn || userContext);
+      const isReminderOrTask = !isBareConfirmation && /\b(?:ingat|ingatkan|pengingat|kumpul|kumpulkan|uts|uas|tugas|deadline|tenggat|ujian|pr)\b/i.test(userContext);
 
       if (!allowDocumentEvidence && userContext.trim()) {
         if (!contextDates.has(date)) return null;

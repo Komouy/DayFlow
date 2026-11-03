@@ -155,12 +155,12 @@
     gap: 4px;
   }
 
-  /* Mobile Unified AI Plan Card — 1 Single Page/Border */
+  /* Mobile Unified AI Plan Card — Seamless Docking (No Bottom Dead Margin) */
   .main-viewport:has(.view-ai-redesign) {
-    padding-right: 8px !important;
-    padding-bottom: 84px !important;
-    padding-left: 8px !important;
-    padding-top: 8px !important;
+    padding-right: 6px !important;
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-left: 6px !important;
+    padding-top: 6px !important;
   }
 
   .view-ai-redesign {
@@ -170,9 +170,9 @@
   }
 
   .unified-ai-card {
-    height: calc(100dvh - 54px - 84px - 16px - env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(100dvh - 54px - 68px - 6px - env(safe-area-inset-bottom, 0px)) !important;
     min-height: 320px !important;
-    max-height: calc(100dvh - 54px - 84px - 16px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 54px - 68px - 6px - env(safe-area-inset-bottom, 0px)) !important;
     border-radius: var(--radius-md) !important;
     border: 1px solid var(--border-subtle) !important;
     display: flex !important;

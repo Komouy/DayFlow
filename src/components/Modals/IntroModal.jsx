@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getLocalDateString } from '../../services/state';
 import {
+  Bot,
   ShieldCheck,
   ArrowRight,
   ArrowLeft,
@@ -324,7 +325,7 @@ export default function IntroModal() {
                   <div className="intro-chat-bubble ai-bubble">
                     <div className="intro-ai-badge-row">
                       <div className="intro-ai-sender">
-                        <img src="/icons/dayflow-logo.png" alt="AI" className="w-[13px] h-[13px] rounded-sm object-cover inline-block" />
+                        <Bot size={13} className="text-orange" />
                         <span>DayFlow AI</span>
                       </div>
                       <span className="intro-ai-status-badge">
@@ -376,7 +377,7 @@ export default function IntroModal() {
                 <div className="chatbot-dock-header">
                   <div className="chatbot-dock-identity">
                     <div className="chatbot-dock-avatar" aria-hidden="true">
-                      <img src="/icons/dayflow-logo.png" alt="AI" className="w-4 h-4 rounded-sm object-cover" />
+                      <Bot size={16} />
                     </div>
                     <div className="chatbot-dock-meta">
                       <div className="chatbot-dock-title-row">
@@ -419,7 +420,7 @@ export default function IntroModal() {
                     onClick={() => handleQuickPrompt('Susun jadwal fokus kerja dan istirahat hari ini')}
                     title="Minta Asisten AI Menyusun Jadwal Hari Ini"
                   >
-                    <img src="/icons/dayflow-logo.png" alt="AI" className="w-3 h-3 rounded-sm object-cover inline-block" />
+                    <Bot size={12} />
                     <span>Susun Jadwal AI</span>
                   </button>
 

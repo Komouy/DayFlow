@@ -10,20 +10,12 @@ import {
   Pin,
   Moon,
   Sun,
+  Bot,
   Settings,
   PlusCircle,
   HelpCircle,
   ArrowRight
 } from 'lucide-react';
-
-const DayFlowLogo = ({ size = 16, className = '' }) => (
-  <img
-    src="/icons/dayflow-logo.png"
-    alt="DayFlow"
-    style={{ width: `${size}px`, height: `${size}px` }}
-    className={`rounded-sm object-cover inline-block ${className}`}
-  />
-);
 
 export default function SearchModal() {
   const {
@@ -72,7 +64,7 @@ export default function SearchModal() {
         type: 'action',
         title: 'Asisten AI (Jadwal & Catatan)',
         subtitle: 'Atur agenda harian dan catatan melalui chatbot AI',
-        icon: DayFlowLogo,
+        icon: Bot,
         shortcut: '3 / N',
         action: () => {
           closeSearchModal();
@@ -96,7 +88,7 @@ export default function SearchModal() {
         type: 'action',
         title: 'Buka Asisten AI (Rencana AI)',
         subtitle: 'Konsultasikan jadwal atau rencanakan hari',
-        icon: DayFlowLogo,
+        icon: Bot,
         shortcut: '3',
         action: () => {
           closeSearchModal();
@@ -228,7 +220,7 @@ export default function SearchModal() {
         type: 'action',
         title: `Tanyakan AI: "${query.trim()}"`,
         subtitle: 'Kirim instruksi langsung ke Asisten AI DayFlow',
-        icon: DayFlowLogo,
+        icon: Bot,
         shortcut: 'Enter',
         action: () => {
           closeSearchModal();

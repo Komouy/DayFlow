@@ -16,6 +16,7 @@ import {
   Circle,
   Trash2,
   Edit2,
+  Bot,
   AlertTriangle,
   Loader2,
   ExternalLink,
@@ -198,7 +199,7 @@ export default function ScheduleView() {
             }}
             title="Atur jadwal tanggal ini melalui Chatbot AI"
           >
-            <img src="/icons/dayflow-logo.png" alt="AI" className="w-[15px] h-[15px] rounded-sm object-cover inline-block" />
+            <Bot size={15} />
             <span>Atur Jadwal AI</span>
           </button>
         </div>
@@ -307,7 +308,7 @@ export default function ScheduleView() {
             {isResolving ? (
               <Loader2 size={13} className="animate-spin text-orange" />
             ) : (
-              <img src="/icons/dayflow-logo.png" alt="AI" className="w-[13px] h-[13px] rounded-sm object-cover inline-block" />
+              <Bot size={13} />
             )}
             <span>Selesaikan Otomatis dengan AI</span>
           </button>
@@ -538,7 +539,7 @@ export default function ScheduleView() {
               className="btn btn-secondary btn-sm"
               onClick={() => setActiveTab('ai-plan')}
             >
-              <img src="/icons/dayflow-logo.png" alt="AI" className="w-[14px] h-[14px] rounded-sm object-cover inline-block" />
+              <Bot size={14} className="text-orange" />
               <span>Susun Jadwal dengan AI</span>
             </button>
           </div>

@@ -343,3 +343,60 @@
   }
 
 }
+
+/* ==========================================================================
+   MOBILE PERFORMANCE & HARDWARE ACCELERATION OPTIMIZATIONS
+   Keeps 60/120fps scrolling smooth, eliminates lag & jank on Android/iOS
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* GPU Compositing for Fixed & Sticky Shells */
+  .bottom-nav-shell,
+  .main-header,
+  .chat-bottom-dock-redesign,
+  .top-notification-banner {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
+  }
+
+  /* Smooth Momentum Scrolling & Isolation */
+  .main-viewport,
+  .chat-history-scroll,
+  .timeline-container,
+  .notes-grid-clean,
+  .custom-time-column,
+  .modal-content-wrap {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    scroll-behavior: smooth;
+  }
+
+  /* Containment for list items to prevent full document reflows */
+  .timeline-card,
+  .chat-bubble-row,
+  .note-card-clean,
+  .ai-starter-card {
+    contain: content;
+  }
+
+  /* Reduce blur load on mobile GPU to preserve battery and maintain high refresh rates */
+  .bottom-nav,
+  .modal-overlay,
+  .card-glass {
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  /* Prevent text selection lag on interactive buttons */
+  .btn,
+  .nav-tab,
+  .pill-btn,
+  .filter-pill,
+  .quick-starter-card {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}

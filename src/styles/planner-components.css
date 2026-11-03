@@ -538,8 +538,21 @@
 }
 
 .select-clean {
-  background-color: var(--bg-surface) !important;
+  background-color: var(--bg-surface-elevated) !important;
   cursor: pointer;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-medium);
+  font-weight: 500;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.select-clean:hover {
+  border-color: var(--border-hover);
+}
+
+.select-clean:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-soft);
 }
 
 .clean-toggle-field {

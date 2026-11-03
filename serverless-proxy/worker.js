@@ -134,8 +134,8 @@ export default {
         groqConfigured: isGroqSet,
         grokConfigured: isGroqSet,
         keyConfigured: isGeminiSet || isGroqSet,
-        defaultGeminiModel: 'gemini-3.5-flash-lite',
-        defaultGroqModel: 'llama-3.3-70b-versatile',
+        defaultGeminiModel: 'gemini-2.0-flash-lite',
+        defaultGroqModel: 'llama-3.1-8b-instant',
         timestamp: new Date().toISOString()
       }), {
         status: 200,
@@ -166,7 +166,7 @@ export default {
     // Determine Groq endpoint & default model based on key prefix
     const isXaiKey = grokKey.startsWith('xai-');
     const grokEndpoint = env.GROQ_API_URL || (isXaiKey ? 'https://api.x.ai/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions');
-    const grokModel = env.GROQ_MODEL || env.GROK_MODEL || (isXaiKey ? 'grok-2-latest' : 'llama-3.3-70b-versatile');
+    const grokModel = env.GROQ_MODEL || env.GROK_MODEL || (isXaiKey ? 'grok-2-latest' : 'llama-3.1-8b-instant');
 
     if (!geminiKey && !grokKey) {
       return new Response(JSON.stringify({
@@ -194,28 +194,56 @@ export default {
 
       let lastError = null;
 
-      // Helper function to call Groq (GroqCloud / xAI)
+      // Helper function to call Groq (GroqCloud / xAI) with multi-model fallback
       const callGroq = async () => {
-        const grokPayload = convertGeminiPayloadToOpenAI(payload, grokModel);
-        const grokRes = await fetch(grokEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${grokKey}`
-          },
-          body: JSON.stringify(grokPayload)
-        });
+        const candidateGroqModels = isXaiKey
+          ? ['grok-2-latest', 'grok-beta']
+          : [
+              reqBody.model,
+              grokModel,
+              'llama-3.1-8b-instant',
+              'llama-3.3-70b-versatile',
+              'llama3-8b-8192',
+              'llama3-70b-8192',
+              'gemma2-9b-it',
+              'mixtral-8x7b-32768'
+            ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
-        if (grokRes.ok) {
-          const grokData = await grokRes.json();
-          const adaptedResponse = convertOpenAIToGeminiResponse(grokData);
-          adaptedResponse.provider = isXaiKey ? 'xai-grok' : 'groqcloud';
-          return adaptedResponse;
+        let lastGroqErr = null;
+        for (const currentGroqModel of candidateGroqModels) {
+          try {
+            const grokPayload = convertGeminiPayloadToOpenAI(payload, currentGroqModel);
+            const grokRes = await fetch(grokEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${grokKey}`
+              },
+              body: JSON.stringify(grokPayload)
+            });
+
+            if (grokRes.ok) {
+              const grokData = await grokRes.json();
+              const adaptedResponse = convertOpenAIToGeminiResponse(grokData);
+              adaptedResponse.provider = isXaiKey ? 'xai-grok' : 'groqcloud';
+              adaptedResponse.model = currentGroqModel;
+              return adaptedResponse;
+            }
+
+            const grokErrData = await grokRes.json().catch(() => ({}));
+            const grokMsg = grokErrData?.error?.message || `Groq HTTP ${grokRes.status}`;
+            lastGroqErr = new Error(`${currentGroqModel}: ${grokMsg}`);
+
+            const lower = grokMsg.toLowerCase();
+            if (grokRes.status === 404 || lower.includes('not exist') || lower.includes('access') || lower.includes('deprecated') || lower.includes('decommissioned')) {
+              continue;
+            }
+            break;
+          } catch (err) {
+            lastGroqErr = err;
+          }
         }
-
-        const grokErrData = await grokRes.json().catch(() => ({}));
-        const grokMsg = grokErrData?.error?.message || `Groq HTTP ${grokRes.status}`;
-        throw new Error(grokMsg);
+        throw lastGroqErr || new Error('Seluruh model Groq gagal.');
       };
 
       // Helper function to call Gemini candidate models

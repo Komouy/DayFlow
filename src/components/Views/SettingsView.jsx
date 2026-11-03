@@ -468,7 +468,7 @@ export default function SettingsView() {
           {/* Model info banner */}
           <div className="model-info-pill">
             <span className="font-mono" style={{ fontWeight: 600 }}>
-              {aiProvider === 'gemini' ? 'Gemini 2.0 Flash-Lite' : 'Llama 3.3 70B Versatile'}
+              {aiProvider === 'gemini' ? 'Gemini 2.0 Flash-Lite' : 'Llama 3.1 8B Instant'}
             </span>
             <span className="text-muted text-xs">
               {aiProvider === 'gemini' ? 'Tercepat & hemat token' : 'Eksekusi ultra-cepat di Groq LPU'}

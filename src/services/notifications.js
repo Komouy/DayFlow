@@ -41,6 +41,7 @@ class NotificationService {
     this.loadCustomAudioTone();
     this.syncSchedulesToServiceWorker();
     this.preScheduleNotificationTriggers();
+    this._registerPeriodicSync();
     this._checkDeadlineReminders();
     nativeNotifications.init().then(() => {
       const allSchedules = state.getSchedules();
@@ -112,6 +113,19 @@ class NotificationService {
     }
   }
 
+  async _registerPeriodicSync() {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && 'periodicSync' in reg) {
+        await reg.periodicSync.register('dayflow-check-schedules', {
+          minInterval: 15 * 60 * 1000 // Check every 15 minutes in background
+        });
+        console.log('[DayFlow] Periodic background sync registered successfully.');
+      }
+    } catch (_) {}
+  }
+
   // Pre-schedule upcoming reminders in OS/browser via Notification Triggers API
   async preScheduleNotificationTriggers() {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
@@ -147,6 +161,10 @@ class NotificationService {
               icon: '/icons/icon-192.png',
               badge: '/icons/icon-192.png',
               tag: `trigger_${schedule.id}_advance`,
+              vibrate: [300, 150, 300, 150, 450],
+              renotify: true,
+              requireInteraction: true,
+              silent: false,
               showTrigger: new TimestampTrigger(advanceTimeMs),
               data: { scheduleId: schedule.id, scheduleDate: todayStr }
             });
@@ -162,6 +180,10 @@ class NotificationService {
               icon: '/icons/icon-192.png',
               badge: '/icons/icon-192.png',
               tag: `trigger_${schedule.id}_now`,
+              vibrate: [300, 150, 300, 150, 450],
+              renotify: true,
+              requireInteraction: true,
+              silent: false,
               showTrigger: new TimestampTrigger(schedTimeMs),
               data: { scheduleId: schedule.id, scheduleDate: todayStr },
               actions: [
@@ -553,8 +575,9 @@ class NotificationService {
     const defaultOptions = {
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-      vibrate: [200, 100, 200, 100, 250],
-      requireInteraction: false,
+      vibrate: [300, 150, 300, 150, 450],
+      requireInteraction: true,
+      renotify: true,
       silent: false
     };
 

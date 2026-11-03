@@ -4,7 +4,7 @@
  * Notification Triggers, and zero stale-cache freeze.
  */
 
-const CACHE_NAME = 'dayflow-v8.9-react';
+const CACHE_NAME = 'dayflow-v9.0-react';
 const STATIC_ASSETS = [
   '/',
   'index.html',
@@ -75,6 +75,10 @@ async function scheduleNotificationTriggersInSW(schedules = [], advanceMinutes =
           icon: '/icons/icon-192.png',
           badge: '/icons/icon-192.png',
           tag: `trigger_${schedule.id}_advance`,
+          vibrate: [300, 150, 300, 150, 450],
+          renotify: true,
+          requireInteraction: true,
+          silent: false,
           showTrigger: new TimestampTrigger(advMs),
           data: { scheduleId: schedule.id, scheduleDate: schedule.date }
         });
@@ -89,6 +93,10 @@ async function scheduleNotificationTriggersInSW(schedules = [], advanceMinutes =
           icon: '/icons/icon-192.png',
           badge: '/icons/icon-192.png',
           tag: `trigger_${schedule.id}_now`,
+          vibrate: [300, 150, 300, 150, 450],
+          renotify: true,
+          requireInteraction: true,
+          silent: false,
           showTrigger: new TimestampTrigger(schedMs),
           data: { scheduleId: schedule.id, scheduleDate: schedule.date },
           actions: [
@@ -136,6 +144,10 @@ async function checkUpcomingSchedulesInSW() {
           icon: '/icons/icon-192.png',
           badge: '/icons/icon-192.png',
           tag: `sw_${schedule.id}_${diffMins <= 0 ? 'now' : 'advance'}`,
+          vibrate: [300, 150, 300, 150, 450],
+          renotify: true,
+          requireInteraction: true,
+          silent: false,
           data: { scheduleId: schedule.id, scheduleDate: todayStr },
           actions: [
             { action: 'snooze_10', title: 'Tunda 10 Menit' },
@@ -159,6 +171,10 @@ async function checkUpcomingSchedulesInSW() {
           icon: '/icons/icon-192.png',
           badge: '/icons/icon-192.png',
           tag: `sw_deadline_today_${schedule.id}`,
+          vibrate: [300, 150, 300, 150, 450],
+          renotify: true,
+          requireInteraction: true,
+          silent: false,
           data: { scheduleId: schedule.id, scheduleDate: todayStr },
           actions: [
             { action: 'complete', title: 'Tandai Selesai' }

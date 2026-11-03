@@ -22,7 +22,7 @@ export const APP_CONFIG = {
 
   // Groq / xAI Fallback & Direct Configuration
   GROQ_API_URL: 'https://api.groq.com/openai/v1/chat/completions',
-  DEFAULT_GROQ_MODEL: 'llama-3.3-70b-versatile',
+  DEFAULT_GROQ_MODEL: 'llama-3.1-8b-instant',
   GROK_API_URL: 'https://api.x.ai/v1/chat/completions',
   DEFAULT_GROK_MODEL: 'grok-2-latest',
 

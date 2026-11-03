@@ -354,7 +354,7 @@ const DEFAULT_SETTINGS = {
   heroBannerQuote: 'Fokus pada hal penting hari ini.',
   aiProvider: 'gemini',
   groqApiKey: '',
-  groqModel: 'llama-3.3-70b-versatile',
+  groqModel: 'llama-3.1-8b-instant',
   grokApiKey: '',
   grokModel: 'grok-2-latest'
 };
@@ -452,9 +452,9 @@ export class StateManager {
       this._save(STORAGE_KEYS.SETTINGS, this.settings);
     }
 
-    // Auto-migrate to standardized single default Groq model (llama-3.3-70b-versatile)
-    if (!this.settings.groqModel || this.settings.groqModel !== 'llama-3.3-70b-versatile') {
-      this.settings.groqModel = 'llama-3.3-70b-versatile';
+    // Auto-migrate to universally accessible Groq model (llama-3.1-8b-instant)
+    if (!this.settings.groqModel || this.settings.groqModel === 'llama-3.3-70b-versatile') {
+      this.settings.groqModel = 'llama-3.1-8b-instant';
       this._save(STORAGE_KEYS.SETTINGS, this.settings);
     }
 

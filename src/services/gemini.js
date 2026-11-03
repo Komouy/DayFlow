@@ -489,7 +489,7 @@ export class GeminiService {
   }
 
   /**
-   * Direct request to Groq API (GroqCloud / xAI Chat Completions)
+   * Direct request to Groq API (GroqCloud / xAI Chat Completions) with multi-model fallback
    */
   static async requestGroqGenerateContent(payload, customKey = null) {
     const key = (customKey || this.getGroqApiKey()).trim();
@@ -497,26 +497,47 @@ export class GeminiService {
       throw new Error('Groq / Grok API Key belum diatur.');
     }
     const apiUrl = this.getGroqApiUrl(key);
-    const model = this.getGroqModel();
-    const groqPayload = this.convertGeminiPayloadToOpenAI(payload, model);
+    const isXai = key.startsWith('xai-');
+    const primaryModel = this.getGroqModel();
+    const candidateModels = isXai
+      ? [primaryModel, 'grok-2-latest', 'grok-beta'].filter(Boolean)
+      : [primaryModel, 'llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'llama3-8b-8192', 'llama3-70b-8192', 'gemma2-9b-it', 'mixtral-8x7b-32768'].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`
-      },
-      body: JSON.stringify(groqPayload)
-    });
+    let lastError = null;
+    for (const model of candidateModels) {
+      try {
+        const groqPayload = this.convertGeminiPayloadToOpenAI(payload, model);
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${key}`
+          },
+          body: JSON.stringify(groqPayload)
+        });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const msg = errData?.error?.message || `Groq HTTP ${response.status}`;
-      throw new Error(msg);
+        if (response.ok) {
+          const data = await response.json();
+          const adapted = this.convertOpenAIToGeminiResponse(data);
+          adapted.model = model;
+          return adapted;
+        }
+
+        const errData = await response.json().catch(() => ({}));
+        const msg = errData?.error?.message || `Groq HTTP ${response.status}`;
+        lastError = new Error(msg);
+        const lowerMsg = msg.toLowerCase();
+        // If model not found or no access, try next candidate model
+        if (response.status === 404 || lowerMsg.includes('not exist') || lowerMsg.includes('access') || lowerMsg.includes('decommissioned')) {
+          continue;
+        }
+        break;
+      } catch (err) {
+        lastError = err;
+      }
     }
 
-    const data = await response.json();
-    return this.convertOpenAIToGeminiResponse(data);
+    throw lastError || new Error('Groq API gagal merespons.');
   }
 
   // Alias for backward compatibility

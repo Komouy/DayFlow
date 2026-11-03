@@ -187,11 +187,11 @@
 
 @media (min-width: 641px) and (max-width: 1023px) {
   .main-viewport:has(.view-ai-redesign) {
-    padding: 6px 8px calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 6px 8px calc(73px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .unified-ai-card {
-    height: calc(100dvh - 54px - 82px - 6px - env(safe-area-inset-bottom, 0px));
+    height: calc(100dvh - 54px - 73px - 6px - env(safe-area-inset-bottom, 0px));
     min-height: 360px;
   }
 }
@@ -248,6 +248,7 @@
 .ai-header-title {
   font-size: 16px;
   font-weight: 700;
+  line-height: 1.15;
   color: var(--text-primary);
   white-space: nowrap;
 }
@@ -257,6 +258,7 @@
   align-items: center;
   gap: 5px;
   font-size: 11.5px;
+  line-height: 1.2;
   color: var(--text-muted);
   white-space: nowrap;
 }

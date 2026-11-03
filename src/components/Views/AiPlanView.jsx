@@ -847,9 +847,11 @@ export default function AiPlanView() {
                 key={msgId}
                 className={`chat-bubble-row ${isUser ? 'is-user-row' : 'is-ai-row'} ${Array.isArray(msg.proposedSchedules) && msg.proposedSchedules.length > 0 ? 'has-proposed-card' : ''}`}
               >
-                <div className={`chat-avatar ${isUser ? 'avatar-user' : 'avatar-ai'} overflow-hidden`}>
-                  {isUser ? <User size={15} /> : <img src="/icons/dayflow-logo.png" alt="DayFlow" className="w-5 h-5 rounded-sm object-cover" />}
-                </div>
+                {isUser && (
+                  <div className="chat-avatar avatar-user overflow-hidden">
+                    <User size={15} />
+                  </div>
+                )}
 
                 <div className="chat-bubble-content">
                   <div className={`chat-bubble ${isUser ? 'bubble-user' : 'bubble-ai'}`}>
@@ -1142,13 +1144,6 @@ export default function AiPlanView() {
 
           {isLoading && (
             <div className="chat-bubble-row is-ai-row">
-              <div className="chat-avatar avatar-ai overflow-hidden">
-                <img
-                  src="/icons/dayflow-logo.png"
-                  alt="DayFlow"
-                  className="w-5 h-5 rounded-sm object-cover thinking-avatar-pulse"
-                />
-              </div>
               <div className="chat-bubble bubble-ai is-thinking-bubble">
                 <div className="thinking-bubble-header">
                   <div className="thinking-pulse-dot" />

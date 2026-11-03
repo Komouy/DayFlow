@@ -148,7 +148,8 @@
   }
 
   .chat-bottom-dock-redesign {
-    padding: 8px 12px;
+    padding: 6px 10px;
+    gap: 6px;
   }
 
   .chat-input-bar {
@@ -158,7 +159,7 @@
   /* Mobile Unified AI Plan Card — Clean Dock Clearance (No Overlap, No Dead Margin) */
   .main-viewport:has(.view-ai-redesign) {
     padding-right: 6px !important;
-    padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(73px + env(safe-area-inset-bottom, 0px)) !important;
     padding-left: 6px !important;
     padding-top: 6px !important;
   }
@@ -170,9 +171,9 @@
   }
 
   .unified-ai-card {
-    height: calc(100dvh - 54px - 82px - 6px - env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(100dvh - 54px - 73px - 6px - env(safe-area-inset-bottom, 0px)) !important;
     min-height: 320px !important;
-    max-height: calc(100dvh - 54px - 82px - 6px - env(safe-area-inset-bottom, 0px)) !important;
+    max-height: calc(100dvh - 54px - 73px - 6px - env(safe-area-inset-bottom, 0px)) !important;
     border-radius: var(--radius-md) !important;
     border: 1px solid var(--border-subtle) !important;
     display: flex !important;
@@ -215,8 +216,9 @@
   .ai-header-titles {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     flex: 1;
-    gap: 1px;
+    gap: 0;
     min-width: 0;
     overflow: hidden;
   }
@@ -228,7 +230,9 @@
     font-size: 14px;
     font-weight: 700;
     color: var(--text-primary);
-    line-height: 1.2;
+    line-height: 1.05;
+    margin: 0;
+    padding: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -243,7 +247,10 @@
     min-width: 0;
     overflow: hidden;
     color: var(--text-muted);
-    font-size: 9.5px;
+    font-size: 10px;
+    line-height: 1.05;
+    margin: 0;
+    padding: 0;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

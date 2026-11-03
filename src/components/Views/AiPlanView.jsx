@@ -8,7 +8,6 @@ import { FormattedMarkdown } from '../../utils/markdownRenderer';
 import { generateGoogleCalendarUrl } from '../../utils/scheduleHelpers';
 import { getNoteAttachmentAccept, prepareNoteAttachment, renderPdfPages } from '../../services/noteAttachments';
 import {
-  Bot,
   User,
   Send,
   Paperclip,
@@ -254,6 +253,7 @@ export default function AiPlanView() {
       const hasRejectedScheduleBlock = Boolean(scheduleBlock && scheduleBlock !== '[]' && parsedSchedules.length === 0);
       const noteBlock = response.match(/\[DAYFLOW_NOTE\]([\s\S]*?)\[\/DAYFLOW_NOTE\]/i)?.[1]?.trim();
       const hasRejectedNoteBlock = Boolean(noteBlock && !parsedNote);
+      const rawCleaned = GeminiService.cleanResponseText(response);
       const cleanText = actionResolution.blockedActions.length
         ? `Saya belum mengubah data karena target atau permintaannya belum bisa dipastikan. ${
           actionResolution.blockedActions.map((action) => {
@@ -263,11 +263,11 @@ export default function AiPlanView() {
         } Sebutkan judul kegiatan/catatan yang tepat dan detail tanggal atau waktunya bila ada beberapa yang serupa.`
         : hasInvalidActionBlock
           ? 'Saya belum mengubah data karena instruksi aksi dari AI tidak dapat divalidasi. Jelaskan kembali tindakan dan judul targetnya secara spesifik.'
-          : hasRejectedScheduleBlock
+          : (hasRejectedScheduleBlock && !rawCleaned)
             ? 'Saya belum membuat usulan jadwal karena tanggal, waktu, atau data jadwal tidak dapat divalidasi. Untuk kegiatan spesifik, kirim tanggal dan waktu yang dimaksud.'
-            : hasRejectedNoteBlock
+            : (hasRejectedNoteBlock && !rawCleaned)
               ? 'Saya belum membuat usulan catatan karena format atau isinya tidak dapat divalidasi. Coba jelaskan kembali informasi yang ingin dicatat.'
-        : GeminiService.cleanResponseText(response);
+        : rawCleaned;
 
       // Contextual Linking: Auto-link schedules & notes generated in the same turn
       if (Array.isArray(parsedSchedules) && parsedSchedules.length > 0 && parsedNote) {
@@ -648,7 +648,7 @@ export default function AiPlanView() {
         <div className="ai-plan-unified-header">
           <div className="ai-header-left">
             <div className="ai-header-avatar">
-              <Bot size={15} />
+              <img src="/icons/dayflow-logo.png" alt="DayFlow" className="w-[18px] h-[18px] rounded-sm object-cover" />
               <span className="ai-live-indicator" />
             </div>
             <div className="ai-header-titles">
@@ -675,8 +675,8 @@ export default function AiPlanView() {
         <div className="chat-history-scroll" ref={chatScrollRef}>
           {isFreshSession ? (
             <div className="ai-welcome-studio">
-              <div className="ai-welcome-badge">
-                <Bot size={22} />
+              <div className="ai-welcome-badge overflow-hidden">
+                <img src="/icons/dayflow-logo.png" alt="DayFlow" className="w-8 h-8 rounded-lg object-cover shadow-sm" />
               </div>
               <h2 className="ai-welcome-title">Mulai Rencana Hari Ini</h2>
               <p className="ai-welcome-subtitle">
@@ -740,8 +740,8 @@ export default function AiPlanView() {
                 key={msg.id || index}
                 className={`chat-bubble-row ${isUser ? 'is-user-row' : 'is-ai-row'} ${Array.isArray(msg.proposedSchedules) && msg.proposedSchedules.length > 0 ? 'has-proposed-card' : ''}`}
               >
-                <div className={`chat-avatar ${isUser ? 'avatar-user' : 'avatar-ai'}`}>
-                  {isUser ? <User size={15} /> : <Bot size={15} />}
+                <div className={`chat-avatar ${isUser ? 'avatar-user' : 'avatar-ai'} overflow-hidden`}>
+                  {isUser ? <User size={15} /> : <img src="/icons/dayflow-logo.png" alt="DayFlow" className="w-5 h-5 rounded-sm object-cover" />}
                 </div>
 
                 <div className="chat-bubble-content">
@@ -1010,8 +1010,8 @@ export default function AiPlanView() {
 
           {isLoading && (
             <div className="chat-bubble-row is-ai-row">
-              <div className="chat-avatar avatar-ai">
-                <Bot size={15} />
+              <div className="chat-avatar avatar-ai overflow-hidden">
+                <img src="/icons/dayflow-logo.png" alt="DayFlow" className="w-5 h-5 rounded-sm object-cover" />
               </div>
               <div className="chat-bubble bubble-ai is-loading-bubble">
                 <Loader2 size={16} className="animate-spin text-orange" />

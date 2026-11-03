@@ -1,6 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Calendar, Clock, Bot, FileText, Settings } from 'lucide-react';
+import { Calendar, Clock, FileText, Settings } from 'lucide-react';
+
+const DayFlowNavIcon = ({ size = 20 }) => (
+  <img
+    src="/icons/dayflow-logo.png"
+    alt="Rencana AI"
+    style={{ width: `${size}px`, height: `${size}px` }}
+    className="rounded-sm object-cover inline-block"
+  />
+);
 
 export default function BottomNav() {
   const { activeTab, setActiveTab } = useApp();
@@ -10,7 +19,7 @@ export default function BottomNav() {
   const navItems = [
     { id: 'today', label: 'Hari Ini', icon: Calendar },
     { id: 'schedule', label: 'Jadwal', icon: Clock },
-    { id: 'ai-plan', label: 'Rencana AI', icon: Bot },
+    { id: 'ai-plan', label: 'Rencana AI', icon: DayFlowNavIcon },
     { id: 'notes', label: 'Catatan', icon: FileText },
     { id: 'settings', label: 'Setelan', icon: Settings }
   ];

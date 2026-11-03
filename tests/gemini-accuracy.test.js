@@ -144,6 +144,22 @@ test('allows AI-generated time slots for an explicitly dated flexible day plan',
   assert.equal(parsed[0].time, '08:30');
 });
 
+test('allows multi-item reminder and deadline requests with explicit days', () => {
+  const s1 = buildSchedule({ title: 'Mengumpulkan UTS PSI', date: '2026-11-04', time: '13:00' });
+  const s2 = buildSchedule({ title: 'Mengumpulkan UTS Aqidah Akhlak', date: '2026-11-05', time: '09:00' });
+  const customResponse = '[DAYFLOW_SCHEDULES]\n' + JSON.stringify([s1, s2]) + '\n[/DAYFLOW_SCHEDULES]';
+
+  const parsed = GeminiService.parseStructuredSchedules(customResponse, {
+    userContext: 'Ingatkan Aku Untuk Mengumpulkan UTS Aqidah Akhlak Pada Hari Kamis Dan Mengumpulkan UTS PSI pada hari rabu ini jam 1 siang'
+  });
+
+  assert.equal(parsed.length, 2);
+  assert.equal(parsed[0].title, 'Mengumpulkan UTS PSI');
+  assert.equal(parsed[0].time, '13:00');
+  assert.equal(parsed[1].title, 'Mengumpulkan UTS Aqidah Akhlak');
+  assert.equal(parsed[1].time, '09:00');
+});
+
 test('rejects invalid dates, incomplete items, and malformed JSON without fallback guesses', () => {
   const invalidDate = scheduleResponse(buildSchedule({ date: '2026-02-31' }));
   const missingTime = scheduleResponse(buildSchedule({ time: '' }));

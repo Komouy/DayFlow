@@ -14,7 +14,7 @@ import {
 import InfoTooltip from '../Common/InfoTooltip';
 import {
   User,
-  Bot,
+  Cpu,
   Zap,
   Moon,
   Sun,
@@ -452,7 +452,7 @@ export default function SettingsView() {
               className={`engine-tab ${aiProvider === 'gemini' ? 'is-active' : ''}`}
               onClick={() => setAiProvider('gemini')}
             >
-              <Bot size={15} />
+              <Cpu size={15} />
               <span>Google Gemini</span>
             </button>
             <button
@@ -538,7 +538,7 @@ export default function SettingsView() {
               onClick={handleTestAi}
               disabled={isTestingAi}
             >
-              <Bot size={13} />
+              <img src="/icons/dayflow-logo.png" alt="AI" className="w-[13px] h-[13px] rounded-sm object-cover inline-block" />
               <span>{isTestingAi ? 'Menguji...' : 'Uji Koneksi AI'}</span>
             </button>
           </div>

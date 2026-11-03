@@ -3,7 +3,6 @@ import { useApp } from '../../context/AppContext';
 import {
   Calendar,
   Clock,
-  Bot,
   FileText,
   Settings,
   Plus,
@@ -66,10 +65,19 @@ export default function Sidebar() {
     }
   };
 
+  const DayFlowNavIcon = ({ size = 20 }) => (
+    <img
+      src="/icons/dayflow-logo.png"
+      alt="Rencana AI"
+      style={{ width: `${size}px`, height: `${size}px` }}
+      className="rounded-sm object-cover inline-block"
+    />
+  );
+
   const navItems = [
     { id: 'today', label: 'Hari Ini', icon: Calendar, keyHint: '1' },
     { id: 'schedule', label: 'Jadwal', icon: Clock, keyHint: '2' },
-    { id: 'ai-plan', label: 'Rencana AI', icon: Bot, keyHint: '3' },
+    { id: 'ai-plan', label: 'Rencana AI', icon: DayFlowNavIcon, keyHint: '3' },
     { id: 'notes', label: 'Catatan', icon: FileText, keyHint: '4' },
     { id: 'settings', label: 'Setelan', icon: Settings, keyHint: '5' }
   ];
@@ -111,7 +119,7 @@ export default function Sidebar() {
             onClick={() => setActiveTab('ai-plan')}
             title="Buka Chatbot Asisten AI untuk Mengatur Seluruh Jadwal & Catatan"
           >
-            <Bot size={15} />
+            <img src="/icons/dayflow-logo.png" alt="AI" className="w-[15px] h-[15px] rounded-sm object-cover" />
             <span>Atur dengan AI</span>
           </button>
         </div>

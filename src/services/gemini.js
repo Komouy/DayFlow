@@ -1532,9 +1532,13 @@ Instruksi Optimasi:
       }
 
       const time = `${String(Number(timeMatch[1])).padStart(2, '0')}:${timeMatch[2]}`;
+      const lastTurn = userContext.trim().split('\n').pop().trim();
+      const isBareConfirmation = /^(?:ya|iya|ok|oke|baik|yes|yup|y|siap)[.!]?$/i.test(lastTurn);
+      const isReminderOrTask = !isBareConfirmation && /\b(?:ingat|ingatkan|pengingat|kumpul|kumpulkan|uts|uas|tugas|deadline|tenggat|ujian|pr)\b/i.test(lastTurn || userContext);
+
       if (!allowDocumentEvidence && userContext.trim()) {
         if (!contextDates.has(date)) return null;
-        if (!flexibleDayPlan && !contextTimes.has(time)) return null;
+        if (!flexibleDayPlan && !isReminderOrTask && !contextTimes.has(time)) return null;
       }
 
       return {
@@ -1551,7 +1555,7 @@ Instruksi Optimasi:
       };
     });
 
-    return normalizedItems.some((item) => !item) ? [] : normalizedItems;
+    return normalizedItems.filter(Boolean);
   }
 
   /**

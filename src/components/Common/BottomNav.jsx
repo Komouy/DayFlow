@@ -4,8 +4,59 @@ import { Calendar, Clock, Bot, FileText, Settings } from 'lucide-react';
 
 export default function BottomNav() {
   const { activeTab, setActiveTab } = useApp();
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const swipeStartRef = useRef(null);
   const suppressClickRef = useRef(false);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        const isShrunk = window.visualViewport.height < window.innerHeight * 0.78;
+        setIsKeyboardOpen(isShrunk);
+        document.body.classList.toggle('keyboard-open', isShrunk);
+      }
+    };
+
+    const handleFocusIn = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') {
+        setIsKeyboardOpen(true);
+        document.body.classList.add('keyboard-open');
+      }
+    };
+
+    const handleFocusOut = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea') {
+        setTimeout(() => {
+          const activeTag = document.activeElement?.tagName?.toLowerCase();
+          if (activeTag !== 'input' && activeTag !== 'textarea') {
+            setIsKeyboardOpen(false);
+            document.body.classList.remove('keyboard-open');
+          }
+        }, 120);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      window.visualViewport.addEventListener('scroll', handleViewportChange);
+    }
+    window.addEventListener('focusin', handleFocusIn);
+    window.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleViewportChange);
+      }
+      window.removeEventListener('focusin', handleFocusIn);
+      window.removeEventListener('focusout', handleFocusOut);
+      document.body.classList.remove('keyboard-open');
+    };
+  }, []);
 
   const navItems = [
     { id: 'today', label: 'Hari Ini', icon: Calendar },
@@ -43,7 +94,7 @@ export default function BottomNav() {
   };
 
   return (
-    <div className="bottom-nav-shell">
+    <div className={`bottom-nav-shell ${isKeyboardOpen ? 'is-keyboard-hidden' : ''}`}>
       <nav
         id="mobile-bottom-navigation"
         className="bottom-nav"

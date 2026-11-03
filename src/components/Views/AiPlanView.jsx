@@ -1248,6 +1248,21 @@ export default function AiPlanView() {
               className="chat-input"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
+              onFocus={() => {
+                document.body.classList.add('keyboard-open');
+                const main = document.querySelector('.main-viewport');
+                if (main) main.classList.add('is-input-focused');
+              }}
+              onBlur={() => {
+                setTimeout(() => {
+                  const active = document.activeElement;
+                  if (active?.tagName?.toLowerCase() !== 'input' && active?.tagName?.toLowerCase() !== 'textarea') {
+                    document.body.classList.remove('keyboard-open');
+                    const main = document.querySelector('.main-viewport');
+                    if (main) main.classList.remove('is-input-focused');
+                  }
+                }, 120);
+              }}
               placeholder="Tulis kegiatan atau rencana..."
               disabled={isLoading}
             />

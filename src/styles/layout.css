@@ -573,6 +573,16 @@ button:hover .lucide-check {
   transform: translateX(-50%) translateZ(0);
 }
 
+.bottom-nav-shell.is-keyboard-hidden,
+body.keyboard-open .bottom-nav-shell,
+.keyboard-open .bottom-nav-shell,
+.app-root-container:has(.chat-bottom-dock-redesign:focus-within) .bottom-nav-shell {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
 .bottom-nav {
   position: relative;
   width: 100%;

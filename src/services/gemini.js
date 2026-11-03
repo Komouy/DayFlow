@@ -288,7 +288,12 @@ Jika pengguna menyertakan gambar (seperti pamflet kegiatan, jadwal kuliah/akadem
 13. PENANGANAN REVISI / PERUBAHAN JADWAL TERDAHULU (UPDATE & RESCHEDULING):
 Ketika pengguna meminta perubahan, revisi jam, pergantian ruangan, penambahan kegiatan, atau pembatalan dari jadwal yang sebelumnya sudah diberikan atau jadwal yang tersimpan:
 - KONSISTENSI & ANTI-HALUSINASI: Pertahankan seluruh mata kuliah / kegiatan lain yang tidak diminta diubah secara utuh. Dilarang merombak, menghilangkan, atau menambah kegiatan lain tanpa instruksi eksplisit pengguna.
-- MODIFIKASI PRESISI: Hanya ubah parameter yang diminta pengguna (contoh: jika pengguna meminta "geser kuliah Kalkulus ke jam 13:00", maka ubah jam Kalkulus menjadi 13:00, sedangkan kegiatan hari lainnya tetap utuh).
+- MODIFIKASI PRESISI & KATA KUNCI JADWAL:
+  Pengguna sering menyebutkan jadwal dengan nama singkat atau kata kunci utama (contoh: "aqidah" untuk "Kumpul UTS Aqidah Akhlak", "psi" untuk "Kumpul UTS PSI", "kalkulus" untuk "Kuliah Kalkulus").
+  JIKA jadwal pada hari/konteks tersebut cocok secara jelas dengan kata kunci yang disebut pengguna:
+  * WAJIB kenali dan proses revisi tersebut secara tepat!
+  * DILARANG menolak dengan alasan "jadwal tidak ditemukan" hanya karena pengguna tidak menuliskan judul lengkap.
+  * Hanya ubah parameter yang diminta pengguna (contoh: ubah jam menjadi 10:00).
 - KEMBALIKAN DAFTAR LENGKAP TERBARU: Di akhir jawaban, WAJIB sertakan blok [DAYFLOW_SCHEDULES] berisi SELURUH jadwal versi terbaru (kombinasi kegiatan yang tidak berubah + kegiatan yang sudah diperbaiki), agar antarmuka DayFlow langsung menyajikan jadwal teranyar secara komprehensif.
 - Jelaskan secara ringkas dan ramah perubahan apa saja yang berhasil disesuaikan.
 
@@ -297,7 +302,7 @@ Ketika pengguna meminta untuk:
 - Menghapus jadwal tertentu (contoh: "hapus jadwal jam 10", "batalkan kuliah Kalkulus", "hapus semua jadwal hari ini")
 - Menandai jadwal sudah selesai atau belum selesai (contoh: "saya sudah selesai Deep Work", "tandai kuliah selesai")
 - Menghapus catatan (contoh: "hapus catatan Todo Sprint")
-- Mengubah jam/tanggal kegiatan yang sudah tersimpan:
+- Mengubah jam/tanggal kegiatan yang sudah tersimpan (contoh: "ubah jam aqidah di hari kamis menjadi jam 10 pagi"):
 Sertakan tag [DAYFLOW_ACTIONS] di akhir balasan:
 [DAYFLOW_ACTIONS]
 [
@@ -310,13 +315,13 @@ Sertakan tag [DAYFLOW_ACTIONS] di akhir balasan:
     "completed": true,
     "newTime": "HH:MM",
     "newDate": "YYYY-MM-DD",
-    "summary": "Deskripsi singkat aksi dalam bahasa Indonesia (contoh: Jadwal 'Kuliah Kalkulus' berhasil dihapus)"
+    "summary": "Deskripsi singkat aksi dalam bahasa Indonesia (contoh: Jadwal 'Kumpul UTS Aqidah Akhlak' berhasil diubah ke 10:00)"
   }
 ]
 [/DAYFLOW_ACTIONS]
 Aturan penting tag [DAYFLOW_ACTIONS]:
 - Jangan menyertakan aksi kecuali pengguna secara jelas meminta jenis tindakan tersebut.
-- Untuk jadwal, gunakan ID dan judul persis dari konteks tersimpan. Untuk catatan, gunakan judul persis.
+- Untuk jadwal, gunakan ID dan judul persis dari konteks tersimpan. Jika pengguna menggunakan kata kunci (misal "aqidah"), cocokkan ke jadwal lengkapnya ("Kumpul UTS Aqidah Akhlak").
 - Jika ada lebih dari satu target yang cocok atau pengguna tidak menyebut target dengan cukup jelas, jangan menebak dan jangan sertakan aksi; tanyakan klarifikasi.
 - Isi tanggal/waktu target dan nilai perubahan hanya dari konteks tersimpan atau instruksi eksplisit pengguna.
 - Jangan menyertakan tag [DAYFLOW_ACTIONS] jika pengguna tidak meminta menghapus, menandai selesai, atau merombak data yang sudah ada.
@@ -1636,13 +1641,32 @@ Instruksi Optimasi:
         block('Permintaan tindakan tidak jelas');
         continue;
       }
-      if (!normalizedTitle || !normalizedText.includes(normalizedTitle)) {
+
+      const stopwords = new Set(['dan', 'yang', 'pada', 'hari', 'jam', 'pukul', 'untuk', 'jadwal', 'tugas', 'kegiatan', 'menjadi', 'besok', 'lusa', 'kemarin', 'pagi', 'siang', 'sore', 'malam']);
+      const titleTokens = normalizedTitle
+        .split(' ')
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 3 && !stopwords.has(t));
+
+      const matchesWordInText = (fullText, token) => {
+        const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, 'i').test(fullText);
+      };
+
+      const userMentionedTitle =
+        normalizedText.includes(normalizedTitle) ||
+        (titleTokens.length > 0 && titleTokens.some((token) => matchesWordInText(normalizedText, token)));
+
+      if (!normalizedTitle || !userMentionedTitle) {
         block('Judul target tidak disebut dengan jelas');
         continue;
       }
 
       if (type === 'DELETE_NOTE') {
-        const matches = (notes || []).filter((note) => normalizeActionTitle(note?.title) === normalizedTitle);
+        const matches = (notes || []).filter((note) => {
+          const nNorm = normalizeActionTitle(note?.title);
+          return nNorm === normalizedTitle || (nNorm && normalizedTitle && (nNorm.includes(normalizedTitle) || normalizedTitle.includes(nNorm)));
+        });
         if (matches.length !== 1) {
           block(matches.length ? 'Ada beberapa catatan dengan judul yang sama' : 'Catatan tidak ditemukan', matches.map((note) => note.title));
           continue;
@@ -1651,7 +1675,10 @@ Instruksi Optimasi:
         continue;
       }
 
-      const titleMatches = (schedules || []).filter((schedule) => normalizeActionTitle(schedule?.title) === normalizedTitle);
+      let titleMatches = (schedules || []).filter((schedule) => {
+        const sNorm = normalizeActionTitle(schedule?.title);
+        return sNorm === normalizedTitle || (sNorm && normalizedTitle && (sNorm.includes(normalizedTitle) || normalizedTitle.includes(sNorm)));
+      });
       if (!titleMatches.length) {
         block('Jadwal tidak ditemukan');
         continue;

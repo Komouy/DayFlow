@@ -256,6 +256,27 @@ test('allows an explicit reschedule while keeping the old time separate from the
   assert.equal(result.resolvedActions[0].schedule.id, schedule.id);
 });
 
+test('allows rescheduling when user refers to schedule by key title word (e.g. aqidah for Kumpul UTS Aqidah Akhlak)', () => {
+  const schedule = { id: 'uts-aqidah', title: 'Kumpul UTS Aqidah Akhlak', date: '2026-11-05', time: '09:00' };
+  const otherSchedule = { id: 'uts-psi', title: 'Kumpul UTS PSI', date: '2026-11-04', time: '13:00' };
+  const result = GeminiService.resolveProposedActions(
+    [{
+      type: 'RESCHEDULE',
+      targetId: schedule.id,
+      targetTitle: schedule.title,
+      targetDate: schedule.date,
+      newTime: '10:00'
+    }],
+    'ubah jam aqidah di hari kamis menjadi jam 10 pagi',
+    [schedule, otherSchedule],
+    []
+  );
+
+  assert.equal(result.blockedActions.length, 0);
+  assert.equal(result.resolvedActions.length, 1);
+  assert.equal(result.resolvedActions[0].schedule.id, 'uts-aqidah');
+});
+
 test('blocks actions that were not requested or whose target was not named', () => {
   const schedule = { id: 'one', title: 'Kuliah DDP', date: '2026-10-29', time: '08:00' };
   const action = [{ type: 'DELETE_SCHEDULE', targetId: 'one', targetTitle: 'Kuliah DDP' }];

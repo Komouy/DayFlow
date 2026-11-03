@@ -76,7 +76,7 @@ export default function App() {
   }, [activeTab]);
 
   return (
-    <div id="app-root" className="app-root-container">
+    <div id="app-root" className={`app-root-container ${activeTab === 'ai-plan' ? 'is-ai-active' : ''}`}>
       {/* Top Header */}
       <Header />
 
@@ -85,7 +85,7 @@ export default function App() {
 
       {/* Main Viewport */}
       <main
-        className="main-viewport"
+        className={`main-viewport ${activeTab === 'ai-plan' ? 'is-ai-view-active' : ''}`}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={() => {

@@ -156,28 +156,57 @@
     gap: 4px;
   }
 
-  /* Mobile Unified AI Plan Card — Clean Dock Clearance (No Overlap, No Dead Margin) */
+  /* Mobile Root & Viewport when AI Plan is active */
+  .app-root-container.is-ai-active {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .main-viewport.is-ai-view-active,
   .main-viewport:has(.view-ai-redesign) {
-    padding-right: 6px !important;
-    padding-bottom: calc(73px + env(safe-area-inset-bottom, 0px)) !important;
-    padding-left: 6px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: 100% !important;
     padding-top: 6px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    transition: padding-bottom 0.15s ease;
+  }
+
+  /* When virtual keyboard is open or chat input is focused: collapse bottom dock clearance */
+  body.keyboard-open .main-viewport.is-ai-view-active,
+  .keyboard-open .main-viewport.is-ai-view-active,
+  .main-viewport.is-ai-view-active:has(.chat-bottom-dock-redesign:focus-within),
+  .main-viewport:has(.chat-bottom-dock-redesign:focus-within) {
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .view-ai-redesign {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
     gap: 0 !important;
   }
 
   .unified-ai-card {
-    height: calc(100dvh - 54px - 73px - 6px - env(safe-area-inset-bottom, 0px)) !important;
-    min-height: 320px !important;
-    max-height: calc(100dvh - 54px - 73px - 6px - env(safe-area-inset-bottom, 0px)) !important;
-    border-radius: var(--radius-md) !important;
-    border: 1px solid var(--border-subtle) !important;
     display: flex !important;
     flex-direction: column !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    border-radius: var(--radius-md) !important;
+    border: 1px solid var(--border-subtle) !important;
     overflow: hidden !important;
   }
 

@@ -169,13 +169,23 @@
   white-space: pre-wrap;
 }
 
-/* Micro Action Bar under AI Bubbles (Anti-Slop Cleanliness) */
+.chat-bubble-row.is-user-row .chat-bubble-content {
+  align-items: flex-end;
+}
+
+/* Micro Action Bar under Chat Bubbles (Anti-Slop Cleanliness) */
 .msg-micro-actions {
   display: flex;
   align-items: center;
   gap: 3px;
   margin-top: 4px;
   padding-left: 2px;
+}
+
+.is-user-micro-actions {
+  justify-content: flex-end;
+  padding-right: 2px;
+  padding-left: 0;
 }
 
 .msg-micro-btn {
@@ -259,6 +269,136 @@
   gap: 8px;
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+
+/* AI Thinking State Animation */
+.is-thinking-bubble {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 7px !important;
+  padding: 10px 14px !important;
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-subtle) !important;
+  border-radius: var(--radius-md) !important;
+  min-width: 190px;
+  max-width: 310px;
+}
+
+.thinking-bubble-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinking-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  box-shadow: 0 0 8px rgba(234, 88, 12, 0.6);
+  animation: thinkingPulse 1.4s infinite ease-in-out;
+  flex-shrink: 0;
+}
+
+.thinking-status-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+}
+
+.thinking-dots-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 15px;
+}
+
+.thinking-dots-wave .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: thinkingWave 1.3s infinite ease-in-out;
+}
+
+.thinking-dots-wave .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+.thinking-dots-wave .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.thinking-dots-wave .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes thinkingPulse {
+  0%, 100% {
+    transform: scale(0.85);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+@keyframes thinkingWave {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+    background: var(--accent-primary);
+  }
+}
+
+.thinking-avatar-pulse {
+  animation: avatarBreathe 2s infinite ease-in-out;
+}
+
+@keyframes avatarBreathe {
+  0%, 100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* Typewriter Streaming Text Animation */
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background-color: var(--accent-primary);
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  animation: cursorBlink 0.8s infinite;
+}
+
+@keyframes cursorBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.fade-in-slide-up {
+  animation: fadeInSlideUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeInSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Proposed items cards */

@@ -33,6 +33,73 @@ import {
   Compass
 } from 'lucide-react';
 
+function StreamingMarkdownBubble({
+  text,
+  isStreaming,
+  onComplete,
+  onScrollBottom
+}) {
+  const [revealedLength, setRevealedLength] = useState(isStreaming ? 0 : (text || '').length);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setRevealedLength((text || '').length);
+      return;
+    }
+
+    const words = (text || '').split(/(\s+)/);
+    const totalWords = words.length;
+    let currentWordIndex = 0;
+    setRevealedLength(0);
+
+    // Dynamic pace: finish in ~1.0 - 1.3s for smooth natural typing
+    const wordsPerTick = Math.max(1, Math.ceil(totalWords / 45));
+    const intervalMs = 22;
+
+    timerRef.current = setInterval(() => {
+      currentWordIndex += wordsPerTick;
+      if (currentWordIndex >= totalWords) {
+        setRevealedLength((text || '').length);
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        if (onComplete) onComplete();
+      } else {
+        const partial = words.slice(0, currentWordIndex).join('');
+        setRevealedLength(partial.length);
+      }
+      if (onScrollBottom) onScrollBottom();
+    }, intervalMs);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [text, isStreaming]);
+
+  const handleFastForward = () => {
+    if (isStreaming && timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+      setRevealedLength((text || '').length);
+      if (onComplete) onComplete();
+      if (onScrollBottom) onScrollBottom();
+    }
+  };
+
+  const displayText = isStreaming ? (text || '').slice(0, revealedLength) : (text || '');
+
+  return (
+    <div
+      className="bubble-text formatted-content select-text"
+      onClick={handleFastForward}
+      title={isStreaming ? 'Klik untuk langsung tampilkan penuh' : ''}
+    >
+      <FormattedMarkdown content={displayText} />
+      {isStreaming && revealedLength < (text || '').length && <span className="streaming-cursor" />}
+    </div>
+  );
+}
+
 export default function AiPlanView() {
   const {
     chatHistory,
@@ -58,6 +125,8 @@ export default function AiPlanView() {
   const [attachment, setAttachment] = useState(null);
   const [isPreparingAttachment, setIsPreparingAttachment] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState(null);
+  const [thinkingPhase, setThinkingPhase] = useState(0);
 
   const chatScrollRef = useRef(null);
   const chatInputRef = useRef(null);
@@ -70,6 +139,12 @@ export default function AiPlanView() {
 
   const isFreshSession = chatHistory.length <= 1 && !chatHistory.some((msg) => msg.role === 'user');
 
+  const scrollChatToBottom = () => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  };
+
   const handleCopyMessage = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -78,6 +153,31 @@ export default function AiPlanView() {
       showToast('Gagal menyalin teks', 'error');
     }
   };
+
+  const handleSaveUserMessageToNotes = (text) => {
+    if (!text || !text.trim()) {
+      showToast('Pesan kosong tidak dapat disimpan', 'warning');
+      return;
+    }
+    const lines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+    const firstLine = lines[0] || 'Catatan Pesan';
+    const title = firstLine.replace(/^[#*-\s]+/, '').slice(0, 60).trim() || 'Catatan Pengguna';
+    state.addNote(title, text);
+    refreshAllState();
+    showToast('Pesan berhasil disimpan ke Catatan', 'success');
+  };
+
+  // Thinking phase status text cycling
+  useEffect(() => {
+    if (!isLoading) {
+      setThinkingPhase(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      setThinkingPhase((prev) => (prev + 1) % 3);
+    }, 1800);
+    return () => clearInterval(timer);
+  }, [isLoading]);
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -346,7 +446,7 @@ export default function AiPlanView() {
         }
       }
 
-      addChatMessage({
+      const newAssistantMsg = addChatMessage({
         role: 'assistant',
         text: cleanText,
         proposedSchedules: parsedSchedules,
@@ -357,6 +457,10 @@ export default function AiPlanView() {
         rawResponse: response,
         timestamp: Date.now()
       });
+
+      if (newAssistantMsg?.id) {
+        setStreamingMessageId(newAssistantMsg.id);
+      }
     } catch (err) {
       addChatMessage({
         role: 'assistant',
@@ -735,9 +839,12 @@ export default function AiPlanView() {
             </div>
           ) : chatHistory.map((msg, index) => {
             const isUser = msg.role === 'user';
+            const msgId = msg.id || index;
+            const isStreaming = streamingMessageId === msgId;
+
             return (
               <div
-                key={msg.id || index}
+                key={msgId}
                 className={`chat-bubble-row ${isUser ? 'is-user-row' : 'is-ai-row'} ${Array.isArray(msg.proposedSchedules) && msg.proposedSchedules.length > 0 ? 'has-proposed-card' : ''}`}
               >
                 <div className={`chat-avatar ${isUser ? 'avatar-user' : 'avatar-ai'} overflow-hidden`}>
@@ -767,242 +874,267 @@ export default function AiPlanView() {
                         <p className="bubble-text">{msg.text}</p>
                       </>
                     ) : (
-                      <div className="bubble-text formatted-content">
-                        <FormattedMarkdown content={msg.text} />
-                      </div>
+                      <StreamingMarkdownBubble
+                        text={msg.text}
+                        isStreaming={isStreaming}
+                        onComplete={() => setStreamingMessageId(null)}
+                        onScrollBottom={scrollChatToBottom}
+                      />
                     )}
                   </div>
 
-                  {!isUser && (
-                    <div className="msg-micro-actions">
+                  {isUser ? (
+                    <div className="msg-micro-actions is-user-micro-actions">
                       <button
                         type="button"
                         className="msg-micro-btn"
                         onClick={() => handleCopyMessage(msg.text)}
-                        title="Salin tanggapan"
-                        aria-label="Salin tanggapan"
+                        title="Salin pesan"
+                        aria-label="Salin pesan"
                       >
                         <Copy size={13} />
                       </button>
-
                       <button
                         type="button"
                         className="msg-micro-btn"
-                        onClick={() => handleRegenerate(index)}
-                        disabled={isLoading}
-                        title="Buat ulang tanggapan asisten AI"
-                        aria-label="Buat ulang"
-                      >
-                        <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="msg-micro-btn"
-                        onClick={() => handleSaveToNotes(msg)}
+                        onClick={() => handleSaveUserMessageToNotes(msg.text)}
                         title="Simpan ke Catatan"
                         aria-label="Simpan ke Catatan"
                       >
                         <FileText size={13} />
                       </button>
                     </div>
-                  )}
+                  ) : !isStreaming ? (
+                    <div className="fade-in-slide-up">
+                      <div className="msg-micro-actions">
+                        <button
+                          type="button"
+                          className="msg-micro-btn"
+                          onClick={() => handleCopyMessage(msg.text)}
+                          title="Salin tanggapan"
+                          aria-label="Salin tanggapan"
+                        >
+                          <Copy size={13} />
+                        </button>
 
-                  {/* Proposed Schedules Card - Check & Direct Inline Edit */}
-                  {Array.isArray(msg.proposedSchedules) && msg.proposedSchedules.length > 0 && (
-                    <div className="proposed-items-card">
-                      <div className="proposed-items-header">
-                        <div className="proposed-items-header-left">
-                          <Calendar size={13} className="text-orange" />
-                          <span className="proposed-items-title">
-                            Rekomendasi Agenda ({msg.proposedSchedules.length})
-                          </span>
-                        </div>
+                        <button
+                          type="button"
+                          className="msg-micro-btn"
+                          onClick={() => handleRegenerate(index)}
+                          disabled={isLoading}
+                          title="Buat ulang tanggapan asisten AI"
+                          aria-label="Buat ulang"
+                        >
+                          <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
+                        </button>
 
-                        <div className="proposed-items-header-actions">
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-xs"
-                            onClick={() => handleAddProposedItem(msg.id)}
-                            title="Tambah kegiatan baru ke daftar usulan"
-                          >
-                            <Plus size={11} />
-                            <span>Tambah</span>
-                          </button>
-
-                          {msg.savedSchedules ? (
-                            <span className="badge-tag badge-tag-success" title="Agenda ini sudah tersimpan di Jadwal Anda">
-                              <Check size={12} /> Tersimpan
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn btn-primary btn-xs"
-                              onClick={() => handleApplySchedules(msg.id)}
-                              title="Terapkan dan simpan semua agenda ini ke Jadwal"
-                            >
-                              <CalendarPlus size={12} />
-                              <span>Simpan ke Jadwal</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="proposed-items-list">
-                        {msg.proposedSchedules.map((item, idx) => {
-                          const targetDate = item.date || todayStr;
-                          const dayItems = state.getSchedules(targetDate);
-                          const [ih, im] = (item.time || '09:00').split(':').map(Number);
-                          const iStart = (isNaN(ih) ? 9 : ih) * 60 + (isNaN(im) ? 0 : im);
-                          const iEnd = iStart + (parseInt(item.duration, 10) || 30);
-                          const conflictExisting = dayItems.find((ex) => {
-                            // If this schedule was already saved, don't flag as conflict with itself
-                            const isSame = (ex.id && item.id && ex.id === item.id) ||
-                              (ex.title?.trim().toLowerCase() === item.title?.trim().toLowerCase() && ex.time === item.time);
-                            if (isSame) return false;
-
-                            const [eh, em] = (ex.time || '09:00').split(':').map(Number);
-                            const eStart = (isNaN(eh) ? 9 : eh) * 60 + (isNaN(em) ? 0 : em);
-                            const eEnd = eStart + (parseInt(ex.duration, 10) || 30);
-                            return iStart < eEnd && iEnd > eStart;
-                          });
-                          const gCalUrl = generateGoogleCalendarUrl(item);
-
-                          return (
-                            <div key={idx} className={`proposed-item-row-editable ${conflictExisting ? 'has-conflict' : ''}`}>
-                              <div className="proposed-field-time" title="Jam mulai kegiatan (klik untuk ubah)">
-                                <Clock size={11} className="text-muted" />
-                                <TimePicker
-                                  id={`ai-proposed-time-${msg.id}-${idx}`}
-                                  value={item.time || '09:00'}
-                                  onChange={(value) => handleUpdateProposedItem(msg.id, idx, 'time', value)}
-                                  compact
-                                />
-                              </div>
-
-                              <div className="proposed-title-wrap">
-                                <input
-                                  type="text"
-                                  className="proposed-input-title"
-                                  value={item.title || ''}
-                                  placeholder="Nama kegiatan..."
-                                  onChange={(e) => handleUpdateProposedItem(msg.id, idx, 'title', e.target.value)}
-                                  title="Nama kegiatan (klik untuk edit langsung)"
-                                />
-                                {conflictExisting && (
-                                  <span
-                                    className="badge-tag badge-tag-warning"
-                                    title={`Waktu bertabrakan dengan: ${conflictExisting.title} (${conflictExisting.time})`}
-                                  >
-                                    <AlertTriangle size={10} /> Bentrok: {conflictExisting.title}
-                                  </span>
-                                )}
-                              </div>
-
-                              <div className="proposed-field-duration font-mono tabular-nums" title="Durasi kegiatan dalam menit">
-                                <input
-                                  type="number"
-                                  min="5"
-                                  step="5"
-                                  className="proposed-input-duration"
-                                  value={item.duration || 30}
-                                  onChange={(e) => handleUpdateProposedItem(msg.id, idx, 'duration', Math.max(5, parseInt(e.target.value, 10) || 5))}
-                                />
-                                <span className="proposed-unit">m</span>
-                              </div>
-
-                              {gCalUrl && (
-                                <a
-                                  href={gCalUrl}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="proposed-action-link"
-                                  title="Buka di Google Calendar"
-                                  aria-label="Buka di Google Calendar"
-                                >
-                                  <ExternalLink size={12} />
-                                </a>
-                              )}
-
-                              <button
-                                type="button"
-                                className="proposed-delete-btn"
-                                onClick={() => handleDeleteProposedItem(msg.id, idx)}
-                                title="Hapus agenda ini dari daftar usulan"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Proposed Note Card */}
-                  {msg.proposedNote && (
-                    <div className="proposed-items-card">
-                      <div className="proposed-items-header">
-                        <span className="proposed-items-title">
+                        <button
+                          type="button"
+                          className="msg-micro-btn"
+                          onClick={() => handleSaveToNotes(msg)}
+                          title="Simpan ke Catatan"
+                          aria-label="Simpan ke Catatan"
+                        >
                           <FileText size={13} />
-                          <span>{msg.proposedNote.title || 'Catatan Baru'}</span>
-                        </span>
-                        {msg.savedNote ? (
-                          <span className="badge-tag badge-tag-success" title="Catatan ini sudah tersimpan di Catatan Anda">
-                            <Check size={11} /> Tersimpan
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-xs"
-                            onClick={() => handleApplyNote(msg.proposedNote, msg.id)}
-                            title="Simpan rangkuman ini ke menu Catatan"
-                          >
-                            <Plus size={11} />
-                            <span>Simpan Catatan</span>
-                          </button>
-                        )}
+                        </button>
                       </div>
-                      <p className="proposed-note-preview">{msg.proposedNote.content}</p>
-                    </div>
-                  )}
 
-                  {/* Executed Actions Receipt (Pilar 1: AI Action Engine with Undo) */}
-                  {Array.isArray(msg.executedActions) && msg.executedActions.length > 0 && (
-                    <div className="executed-actions-card">
-                      <div className="executed-actions-header">
-                        <Zap size={12} className="text-orange" />
-                        <span className="executed-actions-title">Tindakan Dijalankan ({msg.executedActions.length})</span>
-                      </div>
-                      <div className="executed-actions-list">
-                        {msg.executedActions.map((action, aIdx) => (
-                          <div key={aIdx} className={`executed-action-item ${action.undone ? 'is-undone' : ''}`}>
-                            <div className="action-item-left">
-                              {action.undone ? (
-                                <RotateCcw size={12} className="text-muted flex-shrink-0" />
-                              ) : (
-                                <CheckCircle2 size={12} className="text-success flex-shrink-0" />
-                              )}
-                              <span className="action-summary-text">{action.summary}</span>
+                      {/* Proposed Schedules Card - Check & Direct Inline Edit */}
+                      {Array.isArray(msg.proposedSchedules) && msg.proposedSchedules.length > 0 && (
+                        <div className="proposed-items-card">
+                          <div className="proposed-items-header">
+                            <div className="proposed-items-header-left">
+                              <Calendar size={13} className="text-orange" />
+                              <span className="proposed-items-title">
+                                Rekomendasi Agenda ({msg.proposedSchedules.length})
+                              </span>
                             </div>
-                            {action.canUndo && !action.undone ? (
+
+                            <div className="proposed-items-header-actions">
                               <button
                                 type="button"
-                                className="btn-undo-action"
-                                onClick={() => handleUndoAction(msg.id, aIdx)}
-                                title="Batalkan perubahan ini"
+                                className="btn btn-ghost btn-xs"
+                                onClick={() => handleAddProposedItem(msg.id)}
+                                title="Tambah kegiatan baru ke daftar usulan"
                               >
-                                <RotateCcw size={10} />
-                                <span>Urungkan</span>
+                                <Plus size={11} />
+                                <span>Tambah</span>
                               </button>
-                            ) : action.undone ? (
-                              <span className="action-undone-badge">Dibatalkan</span>
-                            ) : null}
+
+                              {msg.savedSchedules ? (
+                                <span className="badge-tag badge-tag-success" title="Agenda ini sudah tersimpan di Jadwal Anda">
+                                  <Check size={12} /> Tersimpan
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-xs"
+                                  onClick={() => handleApplySchedules(msg.id)}
+                                  title="Terapkan dan simpan semua agenda ini ke Jadwal"
+                                >
+                                  <CalendarPlus size={12} />
+                                  <span>Simpan ke Jadwal</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        ))}
-                      </div>
+
+                          <div className="proposed-items-list">
+                            {msg.proposedSchedules.map((item, idx) => {
+                              const targetDate = item.date || todayStr;
+                              const dayItems = state.getSchedules(targetDate);
+                              const [ih, im] = (item.time || '09:00').split(':').map(Number);
+                              const iStart = (isNaN(ih) ? 9 : ih) * 60 + (isNaN(im) ? 0 : im);
+                              const iEnd = iStart + (parseInt(item.duration, 10) || 30);
+                              const conflictExisting = dayItems.find((ex) => {
+                                const isSame = (ex.id && item.id && ex.id === item.id) ||
+                                  (ex.title?.trim().toLowerCase() === item.title?.trim().toLowerCase() && ex.time === item.time);
+                                if (isSame) return false;
+
+                                const [eh, em] = (ex.time || '09:00').split(':').map(Number);
+                                const eStart = (isNaN(eh) ? 9 : eh) * 60 + (isNaN(em) ? 0 : em);
+                                const eEnd = eStart + (parseInt(ex.duration, 10) || 30);
+                                return iStart < eEnd && iEnd > eStart;
+                              });
+                              const gCalUrl = generateGoogleCalendarUrl(item);
+
+                              return (
+                                <div key={idx} className={`proposed-item-row-editable ${conflictExisting ? 'has-conflict' : ''}`}>
+                                  <div className="proposed-field-time" title="Jam mulai kegiatan (klik untuk ubah)">
+                                    <Clock size={11} className="text-muted" />
+                                    <TimePicker
+                                      id={`ai-proposed-time-${msg.id}-${idx}`}
+                                      value={item.time || '09:00'}
+                                      onChange={(value) => handleUpdateProposedItem(msg.id, idx, 'time', value)}
+                                      compact
+                                    />
+                                  </div>
+
+                                  <div className="proposed-title-wrap">
+                                    <input
+                                      type="text"
+                                      className="proposed-input-title"
+                                      value={item.title || ''}
+                                      placeholder="Nama kegiatan..."
+                                      onChange={(e) => handleUpdateProposedItem(msg.id, idx, 'title', e.target.value)}
+                                      title="Nama kegiatan (klik untuk edit langsung)"
+                                    />
+                                    {conflictExisting && (
+                                      <span
+                                        className="badge-tag badge-tag-warning"
+                                        title={`Waktu bertabrakan dengan: ${conflictExisting.title} (${conflictExisting.time})`}
+                                      >
+                                        <AlertTriangle size={10} /> Bentrok: {conflictExisting.title}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="proposed-field-duration font-mono tabular-nums" title="Durasi kegiatan dalam menit">
+                                    <input
+                                      type="number"
+                                      min="5"
+                                      step="5"
+                                      className="proposed-input-duration"
+                                      value={item.duration || 30}
+                                      onChange={(e) => handleUpdateProposedItem(msg.id, idx, 'duration', Math.max(5, parseInt(e.target.value, 10) || 5))}
+                                    />
+                                    <span className="proposed-unit">m</span>
+                                  </div>
+
+                                  {gCalUrl && (
+                                    <a
+                                      href={gCalUrl}
+                                      target="_blank"
+                                      rel="noreferrer noopener"
+                                      className="proposed-action-link"
+                                      title="Buka di Google Calendar"
+                                      aria-label="Buka di Google Calendar"
+                                    >
+                                      <ExternalLink size={12} />
+                                    </a>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    className="proposed-delete-btn"
+                                    onClick={() => handleDeleteProposedItem(msg.id, idx)}
+                                    title="Hapus agenda ini dari daftar usulan"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Proposed Note Card */}
+                      {msg.proposedNote && (
+                        <div className="proposed-items-card">
+                          <div className="proposed-items-header">
+                            <span className="proposed-items-title">
+                              <FileText size={13} />
+                              <span>{msg.proposedNote.title || 'Catatan Baru'}</span>
+                            </span>
+                            {msg.savedNote ? (
+                              <span className="badge-tag badge-tag-success" title="Catatan ini sudah tersimpan di Catatan Anda">
+                                <Check size={11} /> Tersimpan
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-xs"
+                                onClick={() => handleApplyNote(msg.proposedNote, msg.id)}
+                                title="Simpan rangkuman ini ke menu Catatan"
+                              >
+                                <Plus size={11} />
+                                <span>Simpan Catatan</span>
+                              </button>
+                            )}
+                          </div>
+                          <p className="proposed-note-preview">{msg.proposedNote.content}</p>
+                        </div>
+                      )}
+
+                      {/* Executed Actions Receipt (Pilar 1: AI Action Engine with Undo) */}
+                      {Array.isArray(msg.executedActions) && msg.executedActions.length > 0 && (
+                        <div className="executed-actions-card">
+                          <div className="executed-actions-header">
+                            <Zap size={12} className="text-orange" />
+                            <span className="executed-actions-title">Tindakan Dijalankan ({msg.executedActions.length})</span>
+                          </div>
+                          <div className="executed-actions-list">
+                            {msg.executedActions.map((action, aIdx) => (
+                              <div key={aIdx} className={`executed-action-item ${action.undone ? 'is-undone' : ''}`}>
+                                <div className="action-item-left">
+                                  {action.undone ? (
+                                    <RotateCcw size={12} className="text-muted flex-shrink-0" />
+                                  ) : (
+                                    <CheckCircle2 size={12} className="text-success flex-shrink-0" />
+                                  )}
+                                  <span className="action-summary-text">{action.summary}</span>
+                                </div>
+                                {action.canUndo && !action.undone ? (
+                                  <button
+                                    type="button"
+                                    className="btn-undo-action"
+                                    onClick={() => handleUndoAction(msg.id, aIdx)}
+                                    title="Batalkan perubahan ini"
+                                  >
+                                    <RotateCcw size={10} />
+                                    <span>Urungkan</span>
+                                  </button>
+                                ) : action.undone ? (
+                                  <span className="action-undone-badge">Dibatalkan</span>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );
@@ -1011,11 +1143,28 @@ export default function AiPlanView() {
           {isLoading && (
             <div className="chat-bubble-row is-ai-row">
               <div className="chat-avatar avatar-ai overflow-hidden">
-                <img src="/icons/dayflow-logo.png" alt="DayFlow" className="w-5 h-5 rounded-sm object-cover" />
+                <img
+                  src="/icons/dayflow-logo.png"
+                  alt="DayFlow"
+                  className="w-5 h-5 rounded-sm object-cover thinking-avatar-pulse"
+                />
               </div>
-              <div className="chat-bubble bubble-ai is-loading-bubble">
-                <Loader2 size={16} className="animate-spin text-orange" />
-                <span>DayFlow AI sedang berpikir...</span>
+              <div className="chat-bubble bubble-ai is-thinking-bubble">
+                <div className="thinking-bubble-header">
+                  <div className="thinking-pulse-dot" />
+                  <span className="thinking-status-text">
+                    {[
+                      'DayFlow AI sedang menganalisis jadwal...',
+                      'Menyusun alur waktu optimal...',
+                      'Menyiapkan rekomendasi kegiatan...'
+                    ][thinkingPhase]}
+                  </span>
+                </div>
+                <div className="thinking-dots-wave">
+                  <span className="dot" />
+                  <span className="dot" />
+                  <span className="dot" />
+                </div>
               </div>
             </div>
           )}

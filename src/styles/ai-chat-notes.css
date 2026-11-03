@@ -169,6 +169,49 @@
   white-space: pre-wrap;
 }
 
+/* Micro Action Bar under AI Bubbles (Anti-Slop Cleanliness) */
+.msg-micro-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+.msg-micro-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  opacity: 0.72;
+}
+
+.msg-micro-btn:hover {
+  opacity: 1;
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-subtle);
+  transform: translateY(-1px);
+}
+
+.msg-micro-btn:active {
+  transform: scale(0.92);
+}
+
+.msg-micro-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .msg-actions-row {
   display: flex;
   align-items: center;

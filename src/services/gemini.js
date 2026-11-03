@@ -341,7 +341,17 @@ export class GeminiService {
 
   static getGroqModel() {
     const s = state.getSettings();
-    if (s.groqModel) return s.groqModel;
+    const decommissioned = [
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'mixtral-8x7b-32768',
+      'llama3-8b-8192',
+      'llama3-70b-8192',
+      'gemma2-9b-it'
+    ];
+    if (s.groqModel && !decommissioned.includes(s.groqModel)) {
+      return s.groqModel;
+    }
     const key = this.getGroqApiKey();
     if (key.startsWith('xai-')) return 'grok-2-latest';
     return APP_CONFIG.DEFAULT_GROQ_MODEL || 'qwen/qwen3.8-27b';
@@ -499,9 +509,20 @@ export class GeminiService {
     const apiUrl = this.getGroqApiUrl(key);
     const isXai = key.startsWith('xai-');
     const primaryModel = this.getGroqModel();
+    const decommissioned = [
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'mixtral-8x7b-32768',
+      'llama3-8b-8192',
+      'llama3-70b-8192',
+      'gemma2-9b-it'
+    ];
     const candidateModels = isXai
       ? [primaryModel, 'grok-2-latest', 'grok-beta'].filter(Boolean)
-      : [primaryModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+      : [primaryModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b']
+          .filter(Boolean)
+          .filter(m => !decommissioned.includes(m))
+          .filter((v, i, a) => a.indexOf(v) === i);
 
     let lastError = null;
     for (const model of candidateModels) {

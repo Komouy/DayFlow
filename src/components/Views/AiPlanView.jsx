@@ -29,7 +29,9 @@ import {
   AlertTriangle,
   ExternalLink,
   CheckCircle2,
-  Zap
+  Zap,
+  Layers,
+  Compass
 } from 'lucide-react';
 
 export default function AiPlanView() {
@@ -633,9 +635,9 @@ export default function AiPlanView() {
   };
 
   const quickPrompts = [
-    'Susun jadwal fokus hari ini',
-    'Buat rencana hari yang seimbang untuk hari ini',
-    'Rapikan daftar tugas jadi agenda'
+    'Jadwal fokus hari ini',
+    'Rencana hari seimbang',
+    'Rapikan tugas jadi agenda'
   ];
 
   return (
@@ -647,12 +649,11 @@ export default function AiPlanView() {
           <div className="ai-header-left">
             <div className="ai-header-avatar">
               <Bot size={15} />
+              <span className="ai-live-indicator" />
             </div>
             <div className="ai-header-titles">
-              <span className="ai-header-title">Asisten AI</span>
-              <div className="ai-header-subtitle font-mono tabular-nums">
-                <span>{todaySchedules.length} kegiatan</span>
-              </div>
+              <span className="ai-header-title">Rencana AI</span>
+              <span className="ai-header-subtitle">Asisten Jadwal Cerdas</span>
             </div>
           </div>
 
@@ -664,7 +665,7 @@ export default function AiPlanView() {
               title="Mulai sesi baru & bersihkan percakapan"
               aria-label="Mulai sesi baru"
             >
-              <Plus size={14} />
+              <RotateCcw size={13} />
               <span className="btn-label-desktop">Sesi Baru</span>
             </button>
           </div>
@@ -673,16 +674,64 @@ export default function AiPlanView() {
         {/* Chat Area Scroll */}
         <div className="chat-history-scroll" ref={chatScrollRef}>
           {isFreshSession ? (
-            <div className="ai-welcome-screen">
-              <div className="ai-welcome-icon">
-                <Bot size={23} />
+            <div className="ai-welcome-studio">
+              <div className="ai-welcome-badge">
+                <Bot size={22} />
               </div>
-              <span className="ai-welcome-eyebrow">PERENCANA HARIAN</span>
-              <h2>Rencanakan hari dengan lebih teratur</h2>
-              <p>
-                Tulis kegiatanmu dengan bahasa sehari-hari. AI akan menyusunnya menjadi agenda yang
-                bisa kamu periksa dan edit sebelum disimpan.
+              <h2 className="ai-welcome-title">Mulai Rencana Hari Ini</h2>
+              <p className="ai-welcome-subtitle">
+                Tulis kegiatan atau unggah dokumen untuk menyusun agenda harian terstruktur.
               </p>
+
+              <div className="ai-quick-starter-grid">
+                <button
+                  type="button"
+                  className="ai-starter-card"
+                  onClick={() => executeChat('Susun jadwal fokus hari ini')}
+                >
+                  <Clock size={16} className="starter-icon" />
+                  <div className="starter-text">
+                    <span className="starter-title">Jadwal Fokus</span>
+                    <span className="starter-desc">Blok waktu konsentrasi tinggi</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="ai-starter-card"
+                  onClick={() => executeChat('Buat rencana hari yang seimbang')}
+                >
+                  <Layers size={16} className="starter-icon" />
+                  <div className="starter-text">
+                    <span className="starter-title">Rencana Seimbang</span>
+                    <span className="starter-desc">Distribusi kerja dan istirahat</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="ai-starter-card"
+                  onClick={() => executeChat('Rapikan daftar kegiatan jadi agenda terstruktur')}
+                >
+                  <Calendar size={16} className="starter-icon" />
+                  <div className="starter-text">
+                    <span className="starter-title">Agenda Terstruktur</span>
+                    <span className="starter-desc">Tata urutan dan durasi kegiatan</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="ai-starter-card"
+                  onClick={() => executeChat('Evaluasi prioritas harian')}
+                >
+                  <Zap size={16} className="starter-icon" />
+                  <div className="starter-text">
+                    <span className="starter-title">Evaluasi Prioritas</span>
+                    <span className="starter-desc">Urutkan agenda paling esensial</span>
+                  </div>
+                </button>
+              </div>
             </div>
           ) : chatHistory.map((msg, index) => {
             const isUser = msg.role === 'user';
@@ -725,36 +774,36 @@ export default function AiPlanView() {
                   </div>
 
                   {!isUser && (
-                    <div className="msg-actions-row">
+                    <div className="msg-micro-actions">
                       <button
                         type="button"
-                        className="msg-action-btn"
+                        className="msg-micro-btn"
                         onClick={() => handleCopyMessage(msg.text)}
-                        title="Salin ke papan klip"
+                        title="Salin tanggapan"
+                        aria-label="Salin tanggapan"
                       >
-                        <Copy size={11} />
-                        <span>Salin</span>
+                        <Copy size={13} />
                       </button>
 
                       <button
                         type="button"
-                        className="msg-action-btn"
+                        className="msg-micro-btn"
                         onClick={() => handleRegenerate(index)}
                         disabled={isLoading}
                         title="Buat ulang tanggapan asisten AI"
+                        aria-label="Buat ulang"
                       >
-                        <RotateCcw size={11} className={isLoading ? 'animate-spin' : ''} />
-                        <span>Regenerate</span>
+                        <RotateCcw size={13} className={isLoading ? 'animate-spin' : ''} />
                       </button>
 
                       <button
                         type="button"
-                        className="msg-action-btn"
+                        className="msg-micro-btn"
                         onClick={() => handleSaveToNotes(msg)}
-                        title="Salin dan simpan ke Catatan DayFlow"
+                        title="Simpan ke Catatan"
+                        aria-label="Simpan ke Catatan"
                       >
-                        <FileText size={11} />
-                        <span>Catatan</span>
+                        <FileText size={13} />
                       </button>
                     </div>
                   )}
@@ -887,22 +936,6 @@ export default function AiPlanView() {
                           );
                         })}
                       </div>
-
-                      {msg.proposedSchedules.length > 2 && !msg.savedSchedules && (
-                        <div className="proposed-items-footer">
-                          <span className="proposed-help-hint">
-                            Bisa diedit langsung sebelum disimpan.
-                          </span>
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-xs"
-                            onClick={() => handleApplySchedules(msg.id)}
-                          >
-                            <CalendarPlus size={12} />
-                            <span>Simpan Semua ({msg.proposedSchedules.length})</span>
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
 
@@ -990,19 +1023,21 @@ export default function AiPlanView() {
 
         {/* Bottom Dock: Chips, Attachment, and Form */}
         <div className="chat-bottom-dock-redesign">
-          {/* Quick Prompts Chips */}
-          <div className="chat-quick-chips-row">
-            {quickPrompts.map((promptText, i) => (
-              <button
-                key={i}
-                type="button"
-                className="chat-prompt-chip"
-                onClick={() => setInputText(promptText)}
-              >
-                <span>{promptText}</span>
-              </button>
-            ))}
-          </div>
+          {/* Quick Prompts Chips (Shown during active chat) */}
+          {!isFreshSession && (
+            <div className="chat-quick-chips-row">
+              {quickPrompts.map((promptText, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="chat-prompt-chip"
+                  onClick={() => setInputText(promptText)}
+                >
+                  <span>{promptText}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Attachment Preview Pill */}
           {attachment && (
@@ -1069,7 +1104,7 @@ export default function AiPlanView() {
               className="chat-input"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Tulis Jadwal/Catatan..."
+              placeholder="Tulis kegiatan atau rencana..."
               disabled={isLoading}
             />
 
@@ -1078,8 +1113,9 @@ export default function AiPlanView() {
               className="btn btn-primary btn-sm btn-icon"
               disabled={isLoading || isPreparingAttachment || (!inputText.trim() && !attachment)}
               aria-label="Kirim Pesan"
+              title="Kirim pesan"
             >
-              <PenLine size={15} />
+              <Send size={15} />
             </button>
           </form>
 

@@ -24,6 +24,131 @@
   text-align: center;
 }
 
+/* ==========================================================================
+   AI WELCOME STUDIO (ANTI-SLOP EDITORIAL MINIMALISM)
+   ========================================================================== */
+.ai-welcome-studio {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 520px);
+  margin: auto;
+  padding: 36px 20px 24px;
+  text-align: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.ai-welcome-badge {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-medium);
+  color: var(--accent-primary);
+  margin-bottom: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.ai-welcome-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+}
+
+.ai-welcome-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 22px 0;
+  max-width: 420px;
+}
+
+.ai-quick-starter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.ai-starter-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-starter-card:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--accent-primary-border);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.ai-starter-card:active {
+  transform: scale(0.98);
+}
+
+.starter-icon {
+  color: var(--accent-primary);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.starter-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.starter-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.starter-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+@media (max-width: 480px) {
+  .ai-welcome-studio {
+    padding: 20px 12px 16px;
+  }
+  .ai-welcome-title {
+    font-size: 18px;
+  }
+  .ai-welcome-subtitle {
+    font-size: 12px;
+    margin-bottom: 16px;
+  }
+  .ai-quick-starter-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .ai-starter-card {
+    padding: 10px 12px;
+  }
+}
+
 .ai-welcome-icon {
   display: grid;
   width: 52px;
@@ -89,16 +214,29 @@
 }
 
 .ai-header-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, rgba(234, 88, 12, 0.18), rgba(234, 88, 12, 0.05));
-  border: 1px solid rgba(234, 88, 12, 0.25);
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent-primary);
   flex-shrink: 0;
+}
+
+.ai-live-indicator {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 1.5px solid var(--bg-surface);
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.6);
 }
 
 .ai-header-titles {

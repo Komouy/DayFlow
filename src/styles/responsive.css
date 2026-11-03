@@ -317,24 +317,29 @@
     box-shadow: 0 0 5px rgba(234, 88, 12, 0.6);
   }
 
-  .ai-welcome-screen {
-    padding: 20px 14px;
+  .ai-welcome-screen,
+  .ai-welcome-studio {
+    padding: 16px 10px;
   }
 
-  .ai-welcome-icon {
-    width: 44px;
-    height: 44px;
+  .ai-welcome-icon,
+  .ai-welcome-badge {
+    width: 42px;
+    height: 42px;
     margin-bottom: 10px;
-    border-radius: 13px;
+    border-radius: 12px;
   }
 
-  .ai-welcome-screen h2 {
-    max-width: 330px;
-    font-size: 19px;
+  .ai-welcome-screen h2,
+  .ai-welcome-title {
+    max-width: 320px;
+    font-size: 18px;
   }
 
-  .ai-welcome-screen > p {
+  .ai-welcome-screen > p,
+  .ai-welcome-subtitle {
     font-size: 12px;
+    margin-bottom: 16px;
   }
 
 }

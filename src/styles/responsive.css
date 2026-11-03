@@ -349,8 +349,15 @@
    Keeps 60/120fps scrolling smooth, eliminates lag & jank on Android/iOS
    ========================================================================== */
 @media (max-width: 768px) {
-  /* GPU Compositing for Fixed & Sticky Shells */
-  .bottom-nav-shell,
+  /* GPU Compositing for Fixed & Sticky Shells (Preserve Horizontal Centering) */
+  .bottom-nav-shell {
+    transform: translateX(-50%) translateZ(0);
+    -webkit-transform: translateX(-50%) translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
+  }
+
   .main-header,
   .chat-bottom-dock-redesign,
   .top-notification-banner {

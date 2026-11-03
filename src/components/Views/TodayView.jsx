@@ -353,7 +353,7 @@ export default function TodayView() {
         </div>
 
         {/* Quick Filter Timeline Pills: Semua / Belum Selesai / Selesai */}
-        <div className="category-filter-pills-row" style={{ marginTop: '4px', marginBottom: '14px', borderTop: 'none', padding: 0 }}>
+        <div className="category-filter-pills-row timeline-filter-segmented" style={{ marginTop: '4px', marginBottom: '14px', borderTop: 'none', padding: 0 }}>
           <button
             type="button"
             className={`category-filter-pill ${timelineFilter === 'all' ? 'is-active' : ''}`}

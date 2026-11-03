@@ -30,13 +30,26 @@
     border-radius: var(--radius-md);
   }
   .hero-trend-banner.height-compact {
-    height: 140px;
+    height: 125px;
   }
   .hero-trend-banner.height-normal {
-    height: 175px;
+    height: 148px;
   }
   .hero-trend-banner.height-cinematic {
-    height: 215px;
+    height: 180px;
+  }
+  .hero-banner-content {
+    padding: 12px 14px;
+  }
+  .hero-banner-title {
+    font-size: 19px;
+  }
+  .hero-banner-quote {
+    font-size: 11.5px;
+  }
+  .hero-banner-live-clock {
+    padding: 3px 8px;
+    font-size: 11.5px;
   }
 }
 

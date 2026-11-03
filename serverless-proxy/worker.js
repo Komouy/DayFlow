@@ -129,13 +129,13 @@ export default {
       return new Response(JSON.stringify({
         status: 'online',
         service: 'DayFlow AI Serverless Gateway',
-        version: '1.3.1',
+        version: '1.4.0',
         geminiConfigured: isGeminiSet,
         groqConfigured: isGroqSet,
         grokConfigured: isGroqSet,
         keyConfigured: isGeminiSet || isGroqSet,
         defaultGeminiModel: 'gemini-2.0-flash-lite',
-        defaultGroqModel: 'llama-3.1-8b-instant',
+        defaultGroqModel: 'qwen/qwen3.8-27b',
         timestamp: new Date().toISOString()
       }), {
         status: 200,
@@ -166,7 +166,7 @@ export default {
     // Determine Groq endpoint & default model based on key prefix
     const isXaiKey = grokKey.startsWith('xai-');
     const grokEndpoint = env.GROQ_API_URL || (isXaiKey ? 'https://api.x.ai/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions');
-    const grokModel = env.GROQ_MODEL || env.GROK_MODEL || (isXaiKey ? 'grok-2-latest' : 'llama-3.1-8b-instant');
+    const grokModel = env.GROQ_MODEL || env.GROK_MODEL || (isXaiKey ? 'grok-2-latest' : 'qwen/qwen3.8-27b');
 
     if (!geminiKey && !grokKey) {
       return new Response(JSON.stringify({
@@ -201,12 +201,9 @@ export default {
           : [
               reqBody.model,
               grokModel,
-              'llama-3.1-8b-instant',
-              'llama-3.3-70b-versatile',
-              'llama3-8b-8192',
-              'llama3-70b-8192',
-              'gemma2-9b-it',
-              'mixtral-8x7b-32768'
+              'qwen/qwen3.8-27b',
+              'openai/gpt-oss-120b',
+              'openai/gpt-oss-20b'
             ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
         let lastGroqErr = null;

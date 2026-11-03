@@ -354,7 +354,7 @@ const DEFAULT_SETTINGS = {
   heroBannerQuote: 'Fokus pada hal penting hari ini.',
   aiProvider: 'gemini',
   groqApiKey: '',
-  groqModel: 'llama-3.1-8b-instant',
+  groqModel: 'qwen/qwen3.8-27b',
   grokApiKey: '',
   grokModel: 'grok-2-latest'
 };
@@ -452,9 +452,17 @@ export class StateManager {
       this._save(STORAGE_KEYS.SETTINGS, this.settings);
     }
 
-    // Auto-migrate to universally accessible Groq model (llama-3.1-8b-instant)
-    if (!this.settings.groqModel || this.settings.groqModel === 'llama-3.3-70b-versatile') {
-      this.settings.groqModel = 'llama-3.1-8b-instant';
+    // Auto-migrate to universally accessible Groq model (qwen/qwen3.8-27b)
+    const decommissionedGroq = [
+      'llama-3.3-70b-versatile',
+      'llama-3.1-8b-instant',
+      'mixtral-8x7b-32768',
+      'llama3-8b-8192',
+      'llama3-70b-8192',
+      'gemma2-9b-it'
+    ];
+    if (!this.settings.groqModel || decommissionedGroq.includes(this.settings.groqModel)) {
+      this.settings.groqModel = 'qwen/qwen3.8-27b';
       this._save(STORAGE_KEYS.SETTINGS, this.settings);
     }
 

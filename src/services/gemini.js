@@ -344,7 +344,7 @@ export class GeminiService {
     if (s.groqModel) return s.groqModel;
     const key = this.getGroqApiKey();
     if (key.startsWith('xai-')) return 'grok-2-latest';
-    return APP_CONFIG.DEFAULT_GROQ_MODEL || 'llama-3.3-70b-versatile';
+    return APP_CONFIG.DEFAULT_GROQ_MODEL || 'qwen/qwen3.8-27b';
   }
 
   static getGroqApiUrl(key = '') {
@@ -501,7 +501,7 @@ export class GeminiService {
     const primaryModel = this.getGroqModel();
     const candidateModels = isXai
       ? [primaryModel, 'grok-2-latest', 'grok-beta'].filter(Boolean)
-      : [primaryModel, 'llama-3.1-8b-instant', 'llama-3.3-70b-versatile', 'llama3-8b-8192', 'llama3-70b-8192', 'gemma2-9b-it', 'mixtral-8x7b-32768'].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+      : [primaryModel, 'qwen/qwen3.8-27b', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 
     let lastError = null;
     for (const model of candidateModels) {
@@ -697,7 +697,7 @@ export class GeminiService {
         return await executeGemini();
       } catch (geminiErr) {
         console.warn('DayFlow AI: Gemini kendala, mengalihkan ke Groq fallback...', geminiErr);
-        if (groqKey) {
+        if (groqKey || proxyUrl) {
           try {
             return await executeGroq();
           } catch (groqErr) {
